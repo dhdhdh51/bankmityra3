@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Add two new report types to ReportService: 'ckcc-od' (CKCC OD Field Report) and 'ckcc-npa-krm' (CKCC NPA Accounts under KRM OTS Scheme Field Report). These are completely separate from the existing CKCC OD-2 renewal report. Each report queries visit_reports joined with visit_ckcc_details and visit_ots_details respectively, filtered by relevant report_type, and returns the standard report shape. Also add dedicated routes and controller methods for separate printable views and dedicated PDF exports for each.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "1. Add two new entries to ReportService::TYPES array: 'ckcc-od' => ['label' => 'CKCC OD Field Report', 'description' => 'CKCC OD case field verification reports with supervisor details'] and 'ckcc-npa-krm' => ['label' => 'CKCC NPA / KRM OTS Field Report', 'description' => 'NPA accounts under KRM OTS Scheme field verification reports'].",
     "2. Add two new private static methods in ReportService.php: ckccOdReport(array $filters) and ckccNpaKrmReport(array $filters). ckccOdReport queries visit_reports vr JOIN visit_ckcc_details cd ON cd.visit_report_id = vr.id, with columns: visit_date, agent_name, bcbf_code (from users table join), customer_name, loan_account_number, branch_name, outstanding_amount, overdue_amount, renewal_due_date, days_remaining, kyc_status, eligible_for_renewal. ckccNpaKrmReport queries visit_reports vr JOIN visit_ots_details od ON od.visit_report_id = vr.id, with columns: visit_date, agent_name, bcbf_code, customer_name, loan_account_number, branch_name, npa_date, outstanding_amount, scheme, total_settlement_amount, borrower_payable_amount, deposit_received, approval_status, customer_response.",
@@ -29,5 +29,5 @@
     "Confirm new view files exist: `ls /projects/bankmityra3/views/reports/ckcc-od-print.php /projects/bankmityra3/views/reports/ckcc-npa-krm-print.php`"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Used visit_reports.supervisor_name and visit_reports.supervisor_employee_id for the supervisor/BCBF fields since the users table has no reports_to FK. The visit_reports table already stores supervisor details per visit. Created a new layouts/print.php for A4-optimized printable views that works across all screen sizes. Both report types correctly filter by report_type ENUM values: ckcc_renewal for OD reports and ots for NPA/KRM reports."
 }
