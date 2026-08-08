@@ -25,6 +25,7 @@ use App\Controllers\Admin\ReportController;
 use App\Controllers\Admin\RoleController;
 use App\Controllers\Admin\ScorecardController;
 use App\Controllers\Admin\SettingsController;
+use App\Controllers\Admin\BcVisitController;
 use App\Controllers\Admin\SssController;
 use App\Controllers\Admin\TrackingController;
 use App\Controllers\Admin\UserController;
@@ -131,6 +132,11 @@ return static function (Router $router): void {
     $router->form('/bc/sss/create', [SssController::class, 'create']);
     $router->form('/bc/sss/{id}/edit', [SssController::class, 'edit']);
     $router->post('/bc/sss/{id}/delete', [SssController::class, 'delete']);
+
+    $router->get ('/bc/visit', [BcVisitController::class, 'index']);
+    $router->form('/bc/visit/create', [BcVisitController::class, 'create']);
+    $router->form('/bc/visit/{id}/edit', [BcVisitController::class, 'edit']);
+    $router->post('/bc/visit/{id}/delete', [BcVisitController::class, 'delete']);
 
     // Registered before the bare path so /export is never read as a route param.
     $router->get('/bc/scorecard/export', [ScorecardController::class, 'export']);

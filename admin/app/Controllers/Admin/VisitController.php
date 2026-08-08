@@ -482,6 +482,12 @@ final class VisitController extends Controller
         // was not. A missing section reads as an answer on a numbered form: skipping it
         // silently would leave the reader unsure whether section 4 was not applicable or
         // simply lost.
+        //
+        // For CKCC OD-2 renewal reports, this entire section is suppressed - those reports
+        // must not show any OTS/KRM content.
+        $isCkccRenewal = ($report['report_type'] ?? '') === 'ckcc_renewal';
+
+        if (!$isCkccRenewal) {
         $pdf->sectionBand(4, 'KRM OTS Details (If Applicable)');
         if ($ots === null) {
             $pdf->paragraph('Not applicable to this visit - no settlement section was filled in.', 8.6, '#6b7280');
@@ -553,6 +559,7 @@ final class VisitController extends Controller
                 $pdf->paragraph('Why the borrower declined: ' . (string) $ots['rejection_reason'], 8.6, '#8a5a00');
             }
         }
+        } // end if (!$isCkccRenewal)
 
         // ---- 5. CKCC OD-2 renewal details -----------------------------------
         $pdf->sectionBand(5, 'CKCC OD-2 Renewal Details (If Applicable)');
@@ -690,7 +697,11 @@ final class VisitController extends Controller
         $pdf->sectionBand(9, 'Recommendation');
 
         $pdf->groupLabel('KRM OTS');
+        if (!$isCkccRenewal) {
         $pdf->checkboxGrid(self::pdfFlags(VisitReport::OTS_RECOMMENDATION_FLAGS, $ots ?? []), 3);
+        } else {
+            $pdf->paragraph('Not applicable to CKCC OD-2 renewal reports.', 8.6, '#6b7280');
+        }
 
         $pdf->groupLabel('CKCC Renewal');
         $pdf->checkboxGrid(self::pdfFlags(VisitReport::CKCC_RECOMMENDATION_FLAGS, $ckcc ?? []), 3);
@@ -908,7 +919,11 @@ final class VisitController extends Controller
         $pdf->sectionBand(13, 'Final Report Status');
 
         $pdf->groupLabel('KRM OTS');
+        if (!$isCkccRenewal) {
         $pdf->checkboxGrid(self::pdfFlags(VisitReport::OTS_STATUS_FLAGS, $ots ?? []), 3);
+        } else {
+            $pdf->paragraph('Not applicable to CKCC OD-2 renewal reports.', 8.6, '#6b7280');
+        }
 
         $pdf->groupLabel('CKCC OD-2 Renewal');
         $pdf->checkboxGrid(self::pdfFlags(VisitReport::CKCC_STATUS_FLAGS, $ckcc ?? []), 3);
