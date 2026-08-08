@@ -1,0 +1,173 @@
+name: Verify backend
+
+# Lints the PHP tree and runs the core self-tests plus the full integration
+# suite against a real MySQL service.
+on:
+  push:
+    branches: [main, 'feat/**', 'fix/**']
+    paths:
+      - 'admin/**'
+      - 'schema.sql'
+      - 'tools/**'
+      # The upgrade SQL published in DEPLOYMENT.md is executed and compared against
+      # schema.sql, so editing either one has to re-run this workflow.
+      - 'DEPLOYMENT.md'
+      - '.github/workflows/verify-backend.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: PHP syntax
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      matrix:
+        # The oldest version the app supports, and the newest it must not break on.
+        php: ['8.2', '8.4']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo_mysql, mbstring, zip, gd, openssl, fileinfo
+          coverage: none
+
+      - name: Lint every PHP file
+        run: |
+          set -e
+          FAILED=0
+          while IFS= read -r -d '' file; do
+            if ! php -l "$file" > /dev/null; then
+              echo "::error file=$file::PHP syntax error"
+              php -l "$file" || true
+              FAILED=1
+            fi
+          done < <(find admin tools -name '*.php' -print0)
+          echo "Checked $(find admin tools -name '*.php' | wc -l) files"
+          exit $FAILED
+
+  core:
+    name: Core self-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, mbstring, zip, gd, openssl, fileinfo
+          coverage: none
+
+      # Crypto, JWT, XLSX reader/writer, PDF writer, validator, paginator.
+      - name: Run core self-tests
+        run: php tools/selftest-core.php
+
+      # A wrong Subresource Integrity hash makes the browser refuse the file
+      # outright. Nothing server-side can see that: the HTML is correct and every
+      # panel test passes, while the actual page renders unstyled. This shipped
+      # once - the symptom was "the profile menu never closes", because the rule
+      # that hides a dropdown is Bootstrap's and Bootstrap CSS was being blocked.
+      - name: Verify CDN integrity hashes
+        run: php tools/verify-cdn-integrity.php
+
+      - name: Cross-validate the generated XLSX and PDF
+        run: |
+          python3 -m pip install --quiet pypdf openpyxl
+          mkdir -p .verify
+          php tools/crossvalidate.php "$PWD/.verify"
+          python3 tools/crossvalidate.py "$PWD/.verify"
+
+  integration:
+    name: Integration tests (MySQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: lrms
+        ports:
+          - 3306:3306
+        # `mysqladmin ping` answers successfully while the entrypoint's temporary
+        # initialisation server is still up, so it reports ready too early. An
+        # actual query against the target database is the only honest check.
+        options: >-
+          --health-cmd="mysql -uroot -proot -e 'SELECT 1' lrms"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+          --health-start-period=30s
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, mbstring, zip, gd, openssl, fileinfo
+          coverage: none
+
+      # Belt and braces: poll with a real query rather than `mysqladmin ping`,
+      # which returns success against the temporary init server and caused
+      # intermittent "table does not exist" failures during local development.
+      - name: Wait for MySQL
+        run: |
+          for i in $(seq 1 60); do
+            if mysql -h 127.0.0.1 -P 3306 -uroot -proot -e "SELECT 1" lrms > /dev/null 2>&1; then
+              echo "MySQL is ready after ${i} attempt(s)"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "MySQL did not become ready" >&2
+          exit 1
+
+      - name: Import the schema
+        run: mysql -h 127.0.0.1 -P 3306 -uroot -proot lrms < schema.sql
+
+      - name: Verify the schema landed
+        run: |
+          COUNT=$(mysql -h 127.0.0.1 -P 3306 -uroot -proot -N -B lrms \
+            -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='lrms';")
+          echo "Tables created: $COUNT"
+          test "$COUNT" -ge 20
+
+      - name: Run the integration suite
+        env:
+          LRMS_DB_HOST: 127.0.0.1
+          LRMS_DB_PORT: 3306
+          LRMS_DB_NAME: lrms
+          LRMS_DB_USER: root
+          LRMS_DB_PASS: root
+        run: php tools/integration-test.php
+
+      # An upgrade migration is only correct if somebody runs it, and the first
+      # person to run a wrong one should not be the operator, halfway through, on a
+      # populated database, with the new code already serving. This extracts the SQL
+      # from DEPLOYMENT.md, applies it to a database rebuilt in the pre-release shape
+      # and seeded with rows, then compares the result against schema.sql column by
+      # column. It caught two statements that could not execute at all.
+      - name: Verify the documented upgrade SQL
+        env:
+          LRMS_DB_HOST: 127.0.0.1
+          LRMS_DB_PORT: 3306
+          LRMS_DB_USER: root
+          LRMS_DB_PASS: root
+        run: sh tools/verify-upgrade-sql.sh

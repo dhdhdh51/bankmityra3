@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The launch screen.
+
+    The system splash (Theme.LRMS.Splash) can only show a small centred icon, so it
+    shows the D2 monogram. This layout is what comes immediately after it and it
+    carries the full brand lockup - the artwork as supplied, wordmark, tagline and
+    badges included. Both sit on the same navy, so the hand-over is invisible and
+    the lockup is what the agent actually sees on opening the app.
+
+    SplashActivity holds this on screen for a minimum time on purpose; without it
+    a cached session would navigate away before the lockup had been drawn.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/lrms_brand_navy">
+
+    <!--
+        The lockup carries its own dark blue and red background, so running it
+        edge to edge leaves a visible seam where it meets the window navy. Inset
+        with rounded corners instead: it reads as a deliberate plate, and there is
+        no straight line for the eye to catch. maxWidth keeps it sane on a tablet.
+    -->
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/splash_lockup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginStart="26dp"
+        android:layout_marginEnd="26dp"
+        android:adjustViewBounds="true"
+        android:contentDescription="@string/app_name"
+        android:maxWidth="420dp"
+        android:src="@drawable/brand_lockup"
+        app:shapeAppearanceOverlay="@style/ShapeAppearance.LRMS.BrandLarge" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingBottom="48dp">
+
+        <com.google.android.material.progressindicator.CircularProgressIndicator
+            android:id="@+id/splash_progress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:indeterminate="true"
+            app:indicatorColor="@color/lrms_brand_gold"
+            app:indicatorSize="26dp"
+            app:trackThickness="3dp" />
+
+        <!-- Appears only when the check is taking unusually long, so the user
+             knows the app is waiting on the network and not frozen. -->
+        <TextView
+            android:id="@+id/splash_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="@string/splash_still_checking"
+            android:textColor="#99FFFFFF"
+            android:textSize="12sp"
+            android:visibility="invisible"
+            tools:visibility="visible" />
+    </LinearLayout>
+</FrameLayout>

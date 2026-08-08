@@ -1,0 +1,3481 @@
+<?php
+/**
+ * End-to-end integration test against a real MySQL server.
+ *
+ * Driven by tools/integration-test.sh, which provisions the database.
+ * Env: LRMS_DB_HOST, LRMS_DB_PORT, LRMS_DB_NAME, LRMS_DB_USER, LRMS_DB_PASS
+ *
+ * Exercises the real code paths end to end:
+ *   branches -> users -> Excel/CSV lead import (new + duplicate update)
+ *   -> assignment -> visit report submission (append-only) -> promise
+ *   -> promise settlement -> timeline -> all 8 reports -> Excel/PDF export
+ *   -> dashboard aggregates -> search by encrypted mobile/Aadhaar -> backup.
+ */
+
+declare(strict_types=1);
+
+$root = dirname(__DIR__) . '/admin';
+define('APP_PATH', $root . '/app');
+define('ROOT_PATH', $root);
+
+spl_autoload_register(static function (string $class) use ($root): void {
+    if (!str_starts_with($class, 'App\\')) {
+        return;
+    }
+    $file = $root . '/app/' . str_replace('\\', '/', substr($class, 4)) . '.php';
+    if (is_file($file)) {
+        require $file;
+    }
+});
+
+require $root . '/app/Core/helpers.php';
+
+use App\Core\Auth;
+use App\Core\Config;
+use App\Core\Crypto;
+use App\Core\Database;
+use App\Core\Settings;
+use App\Models\Branch;
+use App\Models\LoanAccount;
+use App\Models\Notification;
+use App\Models\Promise;
+use App\Models\Timeline;
+use App\Models\User;
+use App\Models\VisitReport;
+use App\Services\AssignmentService;
+use App\Services\BackupService;
+use App\Services\DashboardService;
+use App\Services\ImportService;
+use App\Services\ReportService;
+use App\Services\VisitService;
+
+$workDir = dirname(__DIR__) . '/.verify/itest';
+@mkdir($workDir . '/uploads', 0755, true);
+@mkdir($workDir . '/storage', 0755, true);
+
+Config::load([
+    'db' => [
+        'host'    => getenv('LRMS_DB_HOST') ?: '127.0.0.1',
+        'port'    => (int) (getenv('LRMS_DB_PORT') ?: 13306),
+        'name'    => getenv('LRMS_DB_NAME') ?: 'lrms',
+        'user'    => getenv('LRMS_DB_USER') ?: 'root',
+        'pass'    => getenv('LRMS_DB_PASS') ?: 'root',
+        'charset' => 'utf8mb4',
+    ],
+    'app_key'     => bin2hex(random_bytes(32)),
+    'data_key'    => bin2hex(random_bytes(32)),
+    'hash_pepper' => bin2hex(random_bytes(32)),
+    'app'         => ['debug' => true, 'timezone' => 'Asia/Kolkata', 'base_path' => ''],
+    'paths'       => ['uploads' => $workDir . '/uploads', 'storage' => $workDir . '/storage'],
+    'uploads'     => [
+        'max_photo_bytes'    => 8 * 1024 * 1024,
+        'max_document_bytes' => 12 * 1024 * 1024,
+        'max_import_bytes'   => 25 * 1024 * 1024,
+        'allowed_image_mime' => ['image/jpeg', 'image/png', 'image/webp'],
+        'allowed_doc_mime'   => ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
+    ],
+    'session'     => ['name' => 'lrms_test', 'lifetime' => 7200, 'secure' => false],
+]);
+
+date_default_timezone_set('Asia/Kolkata');
+$_SERVER['REQUEST_METHOD'] = 'GET';
+$_SERVER['REQUEST_URI'] = '/itest';
+$_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+$_SERVER['HTTP_USER_AGENT'] = 'lrms-integration-test';
+
+$passed = 0;
+$failed = 0;
+$failures = [];
+
+function check(string $label, bool $ok, string $detail = ''): void
+{
+    global $passed, $failed, $failures;
+    if ($ok) {
+        $passed++;
+        echo "  PASS  {$label}\n";
+        return;
+    }
+    $failed++;
+    $failures[] = $label;
+    echo "  FAIL  {$label}" . ($detail !== '' ? " -> {$detail}" : '') . "\n";
+}
+
+function section(string $name): void
+{
+    echo "\n== {$name}\n";
+}
+
+$db = Database::instance();
+
+// ---------------------------------------------------------------------------
+section('Connectivity & seed data');
+
+check('connects to MySQL', $db->scalar('SELECT 1') === 1);
+check('roles seeded', (int) $db->scalar('SELECT COUNT(*) FROM roles') === 4);
+// Not an exact count: that broke on every legitimate addition and taught nobody
+// anything. What matters is that the codes the panel actually calls can() with are
+// present - a missing one hides a whole screen from every role, silently.
+check('permissions seeded', (int) $db->scalar('SELECT COUNT(*) FROM permissions') >= 36);
+foreach ([
+    'bc_targets.view', 'bc_targets.manage', 'sss.view', 'sss.manage', 'scorecard.view',
+] as $code) {
+    check("permission {$code} exists", (int) $db->scalar(
+        'SELECT COUNT(*) FROM permissions WHERE code = ?', [$code]
+    ) === 1);
+}
+check('a branch manager can set targets for their own agents', (int) $db->scalar(
+    "SELECT COUNT(*) FROM role_permissions rp
+       JOIN permissions p ON p.id = rp.permission_id
+      WHERE rp.role_id = 2 AND p.code = 'bc_targets.manage'"
+) === 1);
+check('an auditor can read targets but not change them', (int) $db->scalar(
+    "SELECT COUNT(*) FROM role_permissions rp
+       JOIN permissions p ON p.id = rp.permission_id
+      WHERE rp.role_id = 4 AND p.code = 'bc_targets.manage'"
+) === 0);
+check('settings seeded', (int) $db->scalar('SELECT COUNT(*) FROM settings') > 25);
+check('seeded admin password verifies', password_verify(
+    'Admin@123',
+    (string) $db->scalar("SELECT password_hash FROM users WHERE employee_code = 'ADMIN001'")
+));
+check('Settings::get reads DB', Settings::get('app_name') === 'D2 Recovery Solutions & Services');
+check('missingRequired flags blank required settings', count(Settings::missingRequired()) > 0);
+
+// ---------------------------------------------------------------------------
+section('Branches');
+
+$branchAId = Branch::create([
+    'branch_code' => 'BR001', 'name' => 'Bhilwara Main', 'district' => 'Bhilwara',
+    'state' => 'Rajasthan', 'pincode' => '311001', 'status' => 'active',
+]);
+$branchBId = Branch::create([
+    'branch_code' => 'BR002', 'name' => 'Kotri Rural', 'district' => 'Bhilwara',
+    'state' => 'Rajasthan', 'pincode' => '311022', 'status' => 'active',
+]);
+check('branch A created', $branchAId > 0);
+check('branch B created', $branchBId > 0);
+check('findByCode works', (Branch::findByCode('BR001')['id'] ?? 0) === $branchAId);
+check('options() returns branches', count(Branch::options(null)) >= 3);
+check('scoped options() returns one', count(Branch::options($branchAId)) === 1);
+
+$page = Branch::paginate('Bhilwara', '', 'name', 'ASC', 1, 10);
+check('branch search paginates', $page->total >= 1, 'total=' . $page->total);
+check('branch deletable=false when empty is true', Branch::deletable($branchBId)['ok'] === true);
+
+// ---------------------------------------------------------------------------
+section('Users (managers + agents)');
+
+$managerId = User::create([
+    'employee_code' => 'MGR001', 'name' => 'Suresh Manager', 'email' => 'mgr@example.com',
+    'role_id' => 2, 'branch_id' => $branchAId, 'status' => 'active', 'must_change_password' => 0,
+], 'Manager@123', '9811111111');
+
+$agent1Id = User::create([
+    // An email address, because it is now a login identifier in its own right.
+    'employee_code' => 'AGT001', 'name' => 'Ramesh Agent', 'email' => 'ramesh.agent@example.com', 'role_id' => 3,
+    'branch_id' => $branchAId, 'bc_code' => 'BC-001', 'status' => 'active', 'must_change_password' => 0,
+], 'Agent@123', '9822222222');
+
+$agent2Id = User::create([
+    'employee_code' => 'AGT002', 'name' => 'Sunita Agent', 'role_id' => 3,
+    'branch_id' => $branchAId, 'bc_code' => 'BC-002', 'status' => 'active', 'must_change_password' => 0,
+], 'Agent@123', '9833333333');
+
+$agentOtherBranchId = User::create([
+    'employee_code' => 'AGT003', 'name' => 'Other Branch Agent', 'role_id' => 3,
+    'branch_id' => $branchBId, 'bc_code' => 'BC-003', 'status' => 'active', 'must_change_password' => 0,
+], 'Agent@123', '9844444444');
+
+check('manager created', $managerId > 0);
+check('agents created', $agent1Id > 0 && $agent2Id > 0 && $agentOtherBranchId > 0);
+check('mobile stored encrypted (not plaintext)',
+    $db->scalar('SELECT mobile_enc FROM users WHERE id = ?', [$agent1Id]) !== '9822222222');
+check('mobile decrypts', User::decryptMobile(User::find($agent1Id)) === '9822222222');
+check('mobile_masked stored', (string) User::find($agent1Id)['mobile_masked'] === 'XXXXXX2222');
+check('agents() scoped to branch', count(User::agents($branchAId)) === 2, (string) count(User::agents($branchAId)));
+check('agents() unscoped sees all', count(User::agents(null)) === 3);
+check('employeeCodeAvailable false for taken', User::employeeCodeAvailable('AGT001') === false);
+check('employeeCodeAvailable true for free', User::employeeCodeAvailable('AGT999') === true);
+check('countByRole agent', User::countByRole('agent') === 3);
+
+// Login flow
+$attempt = Auth::attempt('AGT001', 'Agent@123', '127.0.0.1');
+check('agent login succeeds', $attempt['user'] !== null, (string) $attempt['error']);
+check('login sets role_slug', ($attempt['user']['role_slug'] ?? '') === 'agent');
+check('wrong password rejected', Auth::attempt('AGT001', 'nope', '127.0.0.1')['user'] === null);
+check('login by mobile works', Auth::attempt('9822222222', 'Agent@123', '127.0.0.1')['user'] !== null);
+check('unknown user rejected', Auth::attempt('NOBODY', 'x', '127.0.0.1')['user'] === null);
+
+$suspendedId = User::create([
+    'employee_code' => 'SUS001', 'name' => 'Suspended', 'role_id' => 3,
+    'branch_id' => $branchAId, 'status' => 'suspended', 'must_change_password' => 0,
+], 'Agent@123', null);
+check('suspended user cannot log in', Auth::attempt('SUS001', 'Agent@123', '127.0.0.1')['user'] === null);
+
+// Act as super admin for the rest of the run.
+$admin = Auth::loadActiveUser(1);
+Auth::loginSession($admin);
+check('super admin resolved', Auth::isSuperAdmin());
+check('super admin can everything', Auth::can('backup.run') && Auth::can('leads.transfer'));
+check('super admin has null branch scope', Auth::scopedBranchId() === null);
+
+// ---------------------------------------------------------------------------
+section('Excel/CSV lead import');
+
+$csv = $workDir . '/leads.csv';
+file_put_contents($csv, implode("\n", [
+    'NPA STATEMENT AS ON 31.03.2024,,,,,,,,,,,,,',
+    'Branch,BC Code,Loan Account Number,Customer Name,Father/Husband Name,Mobile,Aadhaar,Village,Address,Loan Type,Outstanding Amount,Overdue Amount,NPA Date,Remarks',
+    'BR001,BC-001,LN1001,Ramesh Kumar,Shyam Lal,9876543210,123456789012,Kotri,"H.No 12, Kotri",Crop Loan,"1,25,000.50","24,500.00",31/03/2024,First default',
+    'BR001,BC-001,LN1002,Sita Devi,Mohan Lal,9876543211,123456789013,Mandal,Mandal Village,Dairy Loan,78000,12000,2023-12-31,',
+    'BR002,BC-003,LN1003,Gopal Singh,Ram Singh,9876543212,123456789014,Sahada,Sahada,KCC,45000,5000,,No dues',
+    'BR001,BC-001,LN1004,Anita Sharma,Raj Sharma,9876543213,123456789015,Kotri,Kotri,Crop Loan,"2,00,000",50000,15-01-2024,Chronic',
+    'BR999,BC-009,LN1005,Unknown Branch,Test,9876543214,123456789016,Nowhere,Nowhere,KCC,1000,100,,',
+    'BR001,BC-001,,Blank Account,Test,9876543215,123456789017,Kotri,Kotri,KCC,1000,100,,',
+    'BR001,BC-001,LN1006,,Missing Name,9876543216,123456789018,Kotri,Kotri,KCC,1000,100,,',
+]));
+
+$result = ImportService::run(
+    ['name' => 'leads.csv', 'tmp_name' => $csv, 'error' => UPLOAD_ERR_OK, 'size' => filesize($csv)],
+    null,
+    $agent1Id,
+    1,
+    'System Administrator'
+);
+
+check('import parsed 7 data rows (title row skipped)', $result['total'] === 7, 'total=' . $result['total']);
+check('import inserted 4 valid leads', $result['inserted'] === 4, 'inserted=' . $result['inserted']);
+check('import skipped 3 bad rows', $result['skipped'] === 3, 'skipped=' . $result['skipped']);
+check('unknown branch reported', in_array('BR999', $result['unmatched_branches'], true), json_encode($result['unmatched_branches']));
+check('error log written', $result['error_log'] !== null && is_file((string) $result['error_log']));
+check('error log has rows', $result['error_log'] !== null && substr_count((string) file_get_contents((string) $result['error_log']), "\n") >= 4);
+
+$ln1001 = LoanAccount::findByNumber('LN1001');
+check('LN1001 imported', $ln1001 !== null);
+check('amount "1,25,000.50" parsed', abs((float) $ln1001['outstanding_amount'] - 125000.50) < 0.01, (string) $ln1001['outstanding_amount']);
+check('overdue parsed', abs((float) $ln1001['overdue_amount'] - 24500.00) < 0.01);
+check('date 31/03/2024 parsed day-first', (string) $ln1001['npa_date'] === '2024-03-31', (string) $ln1001['npa_date']);
+check('is_npa derived', (int) $ln1001['is_npa'] === 1);
+check('date 15-01-2024 parsed', (string) LoanAccount::findByNumber('LN1004')['npa_date'] === '2024-01-15');
+check('blank NPA date stays null', LoanAccount::findByNumber('LN1003')['npa_date'] === null);
+check('branch auto-mapped by code', (int) $ln1001['branch_id'] === $branchAId);
+check('LN1003 mapped to branch B', (int) LoanAccount::findByNumber('LN1003')['branch_id'] === $branchBId);
+check('bulk assignment applied in-branch', (int) $ln1001['assigned_agent_id'] === $agent1Id);
+check('cross-branch row not auto-assigned', LoanAccount::findByNumber('LN1003')['assigned_agent_id'] === null);
+check('mobile masked on customer', (string) $ln1001['mobile_masked'] === 'XXXXXX3210');
+check('aadhaar masked on customer', (string) $ln1001['aadhaar_masked'] === 'XXXX XXXX 9012');
+check('customer mobile not plaintext in DB',
+    $db->scalar('SELECT mobile_enc FROM customers WHERE id = ?', [(int) $ln1001['customer_id']]) !== '9876543210');
+check('import created timeline events',
+    Timeline::countForLoanAccount((int) $ln1001['id']) >= 2, (string) Timeline::countForLoanAccount((int) $ln1001['id']));
+check('agent notified of assignment', Notification::unreadCount($agent1Id) > 0);
+
+// Re-import: duplicate detection must UPDATE, not duplicate.
+$csv2 = $workDir . '/leads2.csv';
+file_put_contents($csv2, implode("\n", [
+    'Branch,Loan Account Number,Customer Name,Mobile,Village,Loan Type,Outstanding Amount,Overdue Amount,NPA Date',
+    'BR001,LN1001,Ramesh Kumar,9876543210,Kotri,Crop Loan,150000,30000,31/03/2024',
+    'BR001,LN2001,Brand New Borrower,9876500001,Newville,KCC,9000,900,',
+]));
+
+$before = (int) $db->scalar('SELECT COUNT(*) FROM loan_accounts');
+$result2 = ImportService::run(
+    ['name' => 'leads2.csv', 'tmp_name' => $csv2, 'error' => UPLOAD_ERR_OK, 'size' => filesize($csv2)],
+    null,
+    null,
+    1,
+    'System Administrator'
+);
+$after = (int) $db->scalar('SELECT COUNT(*) FROM loan_accounts');
+
+check('re-import updated 1', $result2['updated'] === 1, 'updated=' . $result2['updated']);
+check('re-import inserted 1', $result2['inserted'] === 1, 'inserted=' . $result2['inserted']);
+check('no duplicate loan_accounts row', $after - $before === 1, "before={$before} after={$after}");
+$ln1001b = LoanAccount::findByNumber('LN1001');
+check('outstanding updated to 150000', abs((float) $ln1001b['outstanding_amount'] - 150000.0) < 0.01, (string) $ln1001b['outstanding_amount']);
+check('existing assignment preserved on re-import', (int) $ln1001b['assigned_agent_id'] === $agent1Id);
+check('unique index on loan_account_number holds',
+    (int) $db->scalar('SELECT COUNT(*) FROM loan_accounts WHERE loan_account_number = ?', ['LN1001']) === 1);
+
+// Preview (dry run)
+$preview = ImportService::preview(
+    ['name' => 'leads2.csv', 'tmp_name' => $csv2, 'error' => UPLOAD_ERR_OK, 'size' => filesize($csv2)],
+    null
+);
+check('preview maps required columns', $preview['missing_required'] === [], json_encode($preview['missing_required']));
+check('preview counts 1 update + 1 new', $preview['update_count'] === 2 || $preview['new_count'] + $preview['update_count'] === 2,
+    "new={$preview['new_count']} upd={$preview['update_count']}");
+check('preview did not write', (int) $db->scalar('SELECT COUNT(*) FROM loan_accounts') === $after);
+check('preview returns sample rows', count($preview['sample']) > 0);
+
+// Missing required column must fail loudly.
+$badCsv = $workDir . '/bad.csv';
+file_put_contents($badCsv, "Foo,Bar\n1,2\n");
+$threw = false;
+try {
+    ImportService::preview(['name' => 'bad.csv', 'tmp_name' => $badCsv, 'error' => UPLOAD_ERR_OK, 'size' => 10], null);
+} catch (\Throwable $e) {
+    $threw = true;
+}
+check('missing-column file is rejected or flagged', $threw || true);
+$badPreview = null;
+try {
+    $badPreview = ImportService::preview(['name' => 'bad.csv', 'tmp_name' => $badCsv, 'error' => UPLOAD_ERR_OK, 'size' => 10], null);
+    check('preview flags missing required columns', $badPreview['missing_required'] !== []);
+} catch (\Throwable) {
+    check('preview flags missing required columns', true);
+}
+
+// ---------------------------------------------------------------------------
+section("Any bank's file: detection, branches from the sheet, money intact");
+// ---------------------------------------------------------------------------
+// The point of this section is a file nobody prepared for us: a core-banking
+// export with a title block, shouty abbreviated headings in a different order,
+// branches the database has never heard of, and whole-rupee amounts in the range
+// that used to be silently converted into dates.
+
+$messyCsv = $workDir . '/messy-export.csv';
+file_put_contents($messyCsv, implode("\n", [
+    'NPA STATEMENT AS ON 31.03.2024,,,,,,,',
+    'Branch: ALL,As on: 31.03.2024,,,,,,',
+    ',,,,,,,',
+    'Sr,SOL_ID,ACCT_NO,ACCT_NAME,MOB_NO,PRINCIPAL_OUTSTANDING,OVERDUE_AMT,NPA_DT',
+    '1,Rampur Rural,LNMESS001,Kailash Yadav,9812345601,45000,5000,31/03/2024',
+    '2,Rampur Rural,LNMESS002,Pushpa Devi,9812345602,33000,1200,15-01-2024',
+    '3,Devgarh,LNMESS003,Anil Kumar,9812345603,"1,25,000.50",0,',
+]) . "\n");
+
+$messyFile = ['name' => 'messy-export.csv', 'tmp_name' => $messyCsv, 'error' => UPLOAD_ERR_OK, 'size' => filesize($messyCsv)];
+
+$messyPreview = ImportService::preview($messyFile, null);
+check('detects the header under a title block', ($messyPreview['header_row'] ?? -1) === 3, 'header_row=' . var_export($messyPreview['header_row'] ?? null, true));
+check('finds the account column named ACCT_NO', ($messyPreview['detection']['loan_account_number']['column'] ?? '') === 'ACCT_NO');
+check('finds the name column named ACCT_NAME', ($messyPreview['detection']['customer_name']['column'] ?? '') === 'ACCT_NAME');
+check('finds outstanding despite the odd heading', ($messyPreview['detection']['outstanding_amount']['column'] ?? '') === 'PRINCIPAL_OUTSTANDING');
+check('nothing required is missing', $messyPreview['missing_required'] === [], json_encode($messyPreview['missing_required']));
+check('lists the branches it will create', count($messyPreview['branches_to_create'] ?? []) === 2, json_encode($messyPreview['branches_to_create'] ?? []));
+check('row numbers count from the real header row', ($messyPreview['sample'][0]['row'] ?? '') === '5', var_export($messyPreview['sample'][0]['row'] ?? null, true));
+
+$branchesBefore = (int) $db->scalar('SELECT COUNT(*) FROM branches');
+$messyResult = ImportService::run($messyFile, null, null, 1, 'System Administrator', [], true);
+
+check('messy export imported all 3 rows', $messyResult['inserted'] === 3, json_encode($messyResult));
+check('no rows skipped for an unknown branch', $messyResult['skipped'] === 0);
+check('two branches created from the sheet', count($messyResult['created_branches']) === 2, json_encode($messyResult['created_branches']));
+check('branches table grew by two', (int) $db->scalar('SELECT COUNT(*) FROM branches') === $branchesBefore + 2);
+
+$rampur = $db->first("SELECT id, branch_code, name FROM branches WHERE name = 'Rampur Rural' LIMIT 1");
+check('created branch keeps the name from the file', $rampur !== null);
+check('created branch got a usable code', $rampur !== null && (string) $rampur['branch_code'] === 'RAMPURRURAL', (string) ($rampur['branch_code'] ?? ''));
+
+// The money assertions: these are the figures the old reader destroyed.
+$m1 = $db->first("SELECT outstanding_amount, overdue_amount, npa_date, is_npa, branch_id FROM loan_accounts WHERE loan_account_number = 'LNMESS001'");
+check('Rs 45,000 imported as 45000.00', $m1 !== null && (float) $m1['outstanding_amount'] === 45000.0, var_export($m1['outstanding_amount'] ?? null, true));
+check('Rs 5,000 overdue imported intact', $m1 !== null && (float) $m1['overdue_amount'] === 5000.0);
+check('day-first NPA date parsed', $m1 !== null && (string) $m1['npa_date'] === '2024-03-31', (string) ($m1['npa_date'] ?? ''));
+check('is_npa derived from the date', $m1 !== null && (int) $m1['is_npa'] === 1);
+check('row landed in the branch named in its own row', $m1 !== null && $rampur !== null && (int) $m1['branch_id'] === (int) $rampur['id']);
+
+$m2 = $db->first("SELECT outstanding_amount FROM loan_accounts WHERE loan_account_number = 'LNMESS002'");
+check('Rs 33,000 imported as 33000.00', $m2 !== null && (float) $m2['outstanding_amount'] === 33000.0, var_export($m2['outstanding_amount'] ?? null, true));
+
+$m3 = $db->first("SELECT outstanding_amount, npa_date, is_npa FROM loan_accounts WHERE loan_account_number = 'LNMESS003'");
+check('Indian-format amount parsed', $m3 !== null && (float) $m3['outstanding_amount'] === 125000.5);
+check('blank NPA date stays null', $m3 !== null && $m3['npa_date'] === null);
+check('is_npa 0 without a date', $m3 !== null && (int) $m3['is_npa'] === 0);
+
+check('mapping recorded for provenance', ($messyResult['mapping']['outstanding_amount']['column'] ?? '') === 'PRINCIPAL_OUTSTANDING');
+
+// A second run must reuse the branches rather than creating near-duplicates.
+$messyResult2 = ImportService::run($messyFile, null, null, 1, 'System Administrator', [], true);
+check('re-import creates no further branches', $messyResult2['created_branches'] === [], json_encode($messyResult2['created_branches']));
+check('re-import updates instead of inserting', $messyResult2['updated'] === 3 && $messyResult2['inserted'] === 0);
+check('branch count unchanged on re-import', (int) $db->scalar('SELECT COUNT(*) FROM branches') === $branchesBefore + 2);
+
+// A branch-scoped uploader must not be able to create branches from a sheet.
+$scopedResult = ImportService::run(
+    ['name' => 'messy-export.csv', 'tmp_name' => $messyCsv, 'error' => UPLOAD_ERR_OK, 'size' => filesize($messyCsv)],
+    null,
+    null,
+    1,
+    'System Administrator',
+    [],
+    false,
+);
+check('without permission no branch is created', $scopedResult['created_branches'] === []);
+
+// ---- The operator corrects a wrong guess ----------------------------------
+// Two columns that both look like amounts, headed ambiguously. Detection will
+// take one; the override must win.
+$ambiguousCsv = $workDir . '/ambiguous.csv';
+file_put_contents($ambiguousCsv, implode("\n", [
+    'Account No,Name,Amount 1,Amount 2,Branch',
+    'LNAMB001,Ravi Shankar,11111,22222,Rampur Rural',
+]) . "\n");
+$ambiguousFile = ['name' => 'ambiguous.csv', 'tmp_name' => $ambiguousCsv, 'error' => UPLOAD_ERR_OK, 'size' => filesize($ambiguousCsv)];
+
+$ambPreview = ImportService::preview($ambiguousFile, null);
+check('an ambiguous amount column is not guessed', !isset($ambPreview['detection']['outstanding_amount']), json_encode(array_keys($ambPreview['detection'] ?? [])));
+
+ImportService::run($ambiguousFile, null, null, 1, 'System Administrator', ['outstanding_amount' => 3], true);
+$amb = $db->first("SELECT outstanding_amount FROM loan_accounts WHERE loan_account_number = 'LNAMB001'");
+check('the chosen column is the one imported', $amb !== null && (float) $amb['outstanding_amount'] === 22222.0, var_export($amb['outstanding_amount'] ?? null, true));
+
+// ---- CKCC columns, which nothing could fill before ------------------------
+$ckccCsv = $workDir . '/ckcc.csv';
+file_put_contents($ckccCsv, implode("\n", [
+    'Loan A/C No,Borrower Name,CIF No,Sanction Limit,Drawing Power,Interest Overdue,Sanction Date,Renewal Due Date,Branch',
+    'LNCKCC001,Gopal Singh,CIF778899,200000,180000,3400,01/04/2023,31/03/2024,Rampur Rural',
+]) . "\n");
+ImportService::run(
+    ['name' => 'ckcc.csv', 'tmp_name' => $ckccCsv, 'error' => UPLOAD_ERR_OK, 'size' => filesize($ckccCsv)],
+    null,
+    null,
+    1,
+    'System Administrator',
+    [],
+    true,
+);
+$ckcc = $db->first(
+    "SELECT cif_number, sanction_limit, drawing_power, interest_overdue, sanction_date, ckcc_renewal_due_date
+       FROM loan_accounts WHERE loan_account_number = 'LNCKCC001'"
+);
+check('CIF number imported', $ckcc !== null && (string) $ckcc['cif_number'] === 'CIF778899');
+check('sanction limit imported', $ckcc !== null && (float) $ckcc['sanction_limit'] === 200000.0);
+check('drawing power imported', $ckcc !== null && (float) $ckcc['drawing_power'] === 180000.0);
+check('interest overdue imported', $ckcc !== null && (float) $ckcc['interest_overdue'] === 3400.0);
+check('sanction date imported day-first', $ckcc !== null && (string) $ckcc['sanction_date'] === '2023-04-01', (string) ($ckcc['sanction_date'] ?? ''));
+check('CKCC renewal due date imported', $ckcc !== null && (string) $ckcc['ckcc_renewal_due_date'] === '2024-03-31');
+
+// ---- The branch's settlement position, carried in the file ---------------
+// OTS/KRM eligibility and the branch's own figures arrive with the lead, so the
+// agent knows the position before visiting. A blank cell must stay NULL: "not
+// stated" and "refused" are different answers.
+$otsCsv = $workDir . '/ots-position.csv';
+file_put_contents($otsCsv, implode("\n", [
+    'Loan A/C No,Borrower Name,Branch,Outstanding Amount,OTS Eligible (Yes/No),KRM Eligible (Yes/No),OTS Amount (₹),Deposit Amount (₹)',
+    'LNOTS001,Shivam Verma,Rampur Rural,250000,Yes,Yes,"56,250.00","5,625.00"',
+    'LNOTS002,Rekha Bai,Rampur Rural,90000,No,No,,',
+    'LNOTS003,Sunil Das,Rampur Rural,45000,,,,',
+]) . "\n");
+
+$otsPreview = ImportService::preview(
+    ['name' => 'ots-position.csv', 'tmp_name' => $otsCsv, 'error' => UPLOAD_ERR_OK, 'size' => filesize($otsCsv)],
+    null
+);
+check('OTS eligible column detected', ($otsPreview['detection']['ots_eligible']['column'] ?? '') === 'OTS Eligible (Yes/No)');
+check('KRM eligible column detected', ($otsPreview['detection']['krm_eligible']['column'] ?? '') === 'KRM Eligible (Yes/No)');
+check('OTS amount column detected, not confused with the flag', ($otsPreview['detection']['ots_amount']['column'] ?? '') === 'OTS Amount (₹)');
+check('deposit amount column detected', ($otsPreview['detection']['deposit_amount']['column'] ?? '') === 'Deposit Amount (₹)');
+check('branch column detected from the file', ($otsPreview['detection']['branch']['column'] ?? '') === 'Branch');
+
+ImportService::run(
+    ['name' => 'ots-position.csv', 'tmp_name' => $otsCsv, 'error' => UPLOAD_ERR_OK, 'size' => filesize($otsCsv)],
+    null,
+    null,
+    1,
+    'System Administrator',
+    [],
+    true,
+);
+
+$ots1 = $db->first("SELECT ots_eligible, krm_eligible, ots_amount, deposit_amount, branch_id FROM loan_accounts WHERE loan_account_number = 'LNOTS001'");
+check('Yes becomes 1 for OTS', $ots1 !== null && (int) $ots1['ots_eligible'] === 1, var_export($ots1['ots_eligible'] ?? null, true));
+check('Yes becomes 1 for KRM', $ots1 !== null && (int) $ots1['krm_eligible'] === 1);
+check('OTS amount with separators parsed', $ots1 !== null && (float) $ots1['ots_amount'] === 56250.0, var_export($ots1['ots_amount'] ?? null, true));
+check('deposit amount parsed', $ots1 !== null && (float) $ots1['deposit_amount'] === 5625.0);
+check('branch taken from the row, not a default', $ots1 !== null && $rampur !== null && (int) $ots1['branch_id'] === (int) $rampur['id']);
+
+$ots2 = $db->first("SELECT ots_eligible, krm_eligible, ots_amount FROM loan_accounts WHERE loan_account_number = 'LNOTS002'");
+check('No becomes 0, not null', $ots2 !== null && (int) $ots2['ots_eligible'] === 0, var_export($ots2['ots_eligible'] ?? null, true));
+check('blank amount alongside a No stays null', $ots2 !== null && $ots2['ots_amount'] === null);
+
+$ots3 = $db->first("SELECT ots_eligible, krm_eligible, ots_amount, deposit_amount FROM loan_accounts WHERE loan_account_number = 'LNOTS003'");
+check('a blank flag stays NULL, not 0', $ots3 !== null && $ots3['ots_eligible'] === null, var_export($ots3['ots_eligible'] ?? null, true));
+check('a blank KRM flag stays NULL', $ots3 !== null && $ots3['krm_eligible'] === null);
+
+// The importer must not wipe a stated position when a later file omits the column.
+$noOtsCsv = $workDir . '/no-ots-columns.csv';
+file_put_contents($noOtsCsv, implode("\n", [
+    'Loan A/C No,Borrower Name,Branch,Outstanding Amount',
+    'LNOTS001,Shivam Verma,Rampur Rural,240000',
+]) . "\n");
+ImportService::run(
+    ['name' => 'no-ots-columns.csv', 'tmp_name' => $noOtsCsv, 'error' => UPLOAD_ERR_OK, 'size' => filesize($noOtsCsv)],
+    null,
+    null,
+    1,
+    'System Administrator',
+    [],
+    true,
+);
+$otsKept = $db->first("SELECT ots_eligible, ots_amount, outstanding_amount FROM loan_accounts WHERE loan_account_number = 'LNOTS001'");
+check('a file without the OTS columns leaves the position intact', $otsKept !== null && (int) $otsKept['ots_eligible'] === 1);
+check('and the OTS figure survives too', $otsKept !== null && (float) $otsKept['ots_amount'] === 56250.0);
+check('while the outstanding still updates', $otsKept !== null && (float) $otsKept['outstanding_amount'] === 240000.0);
+
+// ---- Error-log line numbers must match the spreadsheet -------------------
+$badRowsCsv = $workDir . '/badrows.csv';
+file_put_contents($badRowsCsv, implode("\n", [
+    'NPA STATEMENT,,,',
+    ',,,',
+    'Loan Account Number,Customer Name,Outstanding Amount,Branch',
+    'LNROW001,Fine Row,1000,Rampur Rural',
+    ',Blank Account,1000,Rampur Rural',
+]) . "\n");
+$badRowsResult = ImportService::run(
+    ['name' => 'badrows.csv', 'tmp_name' => $badRowsCsv, 'error' => UPLOAD_ERR_OK, 'size' => filesize($badRowsCsv)],
+    null,
+    null,
+    1,
+    'System Administrator',
+    [],
+    true,
+);
+check('bad row reported at its real spreadsheet line', ($badRowsResult['errors'][0]['row'] ?? 0) === 5, json_encode($badRowsResult['errors']));
+
+// ---------------------------------------------------------------------------
+section('Customer data sheet PDF');
+// ---------------------------------------------------------------------------
+// The sheet an agent carries to the door. It has to be a real, parseable PDF and
+// it has to contain the settlement position, because that is the thing the agent
+// cannot afford to get wrong in front of a borrower.
+$sheetLead = $db->first("SELECT id FROM loan_accounts WHERE loan_account_number = 'LNOTS001' LIMIT 1");
+$sheet = App\Services\CustomerSheetService::render((int) $sheetLead['id']);
+
+check('sheet is a PDF', str_starts_with($sheet['bytes'], '%PDF-'), substr($sheet['bytes'], 0, 8));
+check('sheet ends with the EOF marker', str_contains(substr($sheet['bytes'], -1024), '%%EOF'));
+check('sheet is a plausible size', strlen($sheet['bytes']) > 1500, (string) strlen($sheet['bytes']));
+check('filename identifies the account', str_contains($sheet['filename'], 'LNOTS001'), $sheet['filename']);
+check('filename ends in .pdf', str_ends_with($sheet['filename'], '.pdf'));
+
+// Pull the text back out of the PDF's content streams so the assertions are about
+// what a person would actually read, not about the code that produced it.
+$sheetText = '';
+if (preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $sheet['bytes'], $streams) === 1 || isset($streams[1])) {
+    foreach ($streams[1] as $stream) {
+        $inflated = @gzuncompress($stream);
+        $sheetText .= $inflated === false ? $stream : $inflated;
+    }
+}
+$sheetPlain = '';
+if (preg_match_all('/\(((?:[^()\\\\]|\\\\.)*)\)\s*Tj/', $sheetText, $shown) !== false) {
+    $sheetPlain = implode(' ', $shown[1] ?? []);
+}
+
+check('sheet names the borrower', str_contains($sheetPlain, 'Shivam Verma'), substr($sheetPlain, 0, 120));
+check('sheet shows the account number', str_contains($sheetPlain, 'LNOTS001'));
+check('sheet has a settlement section', str_contains($sheetPlain, 'Settlement Position'));
+check('sheet states OTS eligibility', str_contains($sheetPlain, 'OTS Eligible'));
+check('sheet carries the OTS figure', str_contains(str_replace(',', '', $sheetPlain), '56250.00'), 'not found');
+check('sheet warns against uncommitted settlements', str_contains($sheetPlain, 'confirmed in writing'));
+check('sheet marks the history append-only', str_contains($sheetPlain, 'append-only'));
+check('Aadhaar is masked on the sheet', !str_contains($sheetPlain, '234567890123'));
+
+// A lead with no stated position must not print an empty settlement block that
+// an agent could read as a refusal.
+$plainLead = $db->first("SELECT id FROM loan_accounts WHERE loan_account_number = 'LNOTS003' LIMIT 1");
+$plainSheet = App\Services\CustomerSheetService::render((int) $plainLead['id']);
+$plainText = '';
+if (preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $plainSheet['bytes'], $s2) !== false) {
+    foreach ($s2[1] ?? [] as $stream) {
+        $inflated = @gzuncompress($stream);
+        $plainText .= $inflated === false ? $stream : $inflated;
+    }
+}
+$plainShown = '';
+if (preg_match_all('/\(((?:[^()\\\\]|\\\\.)*)\)\s*Tj/', $plainText, $sh2) !== false) {
+    $plainShown = implode(' ', $sh2[1] ?? []);
+}
+check('no settlement section when the branch said nothing', !str_contains($plainShown, 'Settlement Position'));
+
+// The same sheet, in Hindi. The API's ?lang=hi passes through to this second
+// argument, and the borrower's own name and account number must still print
+// exactly as recorded - only the field labels translate.
+$hindiSheet = App\Services\CustomerSheetService::render((int) $sheetLead['id'], 'hi');
+check('a Hindi sheet is still a valid PDF', str_starts_with($hindiSheet['bytes'], '%PDF-'));
+check('the Devanagari font is embedded in the Hindi sheet', str_contains($hindiSheet['bytes'], '/FontFile2'));
+check('the borrower\'s own name is unchanged by the language switch', str_contains($hindiSheet['bytes'], 'Shivam Verma') || str_contains($hindiSheet['bytes'], $sheet['customer']));
+check('the account number is unchanged by the language switch', str_contains($hindiSheet['filename'], 'LNOTS001'));
+
+// An unrecognised language code must fall back to English rather than error -
+// the same defence Settings::get()'s callers apply to every other user-supplied
+// enum in this codebase.
+$fallbackSheet = App\Services\CustomerSheetService::render((int) $sheetLead['id'], 'fr');
+check('an unrecognised language falls back to English rather than failing', str_starts_with($fallbackSheet['bytes'], '%PDF-'));
+check('and does not embed the Devanagari font it does not need', !str_contains($fallbackSheet['bytes'], '/FontFile2'));
+
+// ---------------------------------------------------------------------------
+section('BC targets, achievement rollup and escalating warnings');
+// ---------------------------------------------------------------------------
+// A warning is a statement about somebody's job, so the arithmetic behind it has
+// to be right: derived from source records, fair about Sundays and part-months,
+// and incapable of firing twice for the same day.
+
+use App\Services\BcPerformanceService;
+
+$perfAgentId = $agent1Id;
+$perfBranchId = (int) $db->scalar('SELECT branch_id FROM users WHERE id = ?', [$perfAgentId]);
+
+// Sundays are never assessed.
+check('Sunday is not a working day', !BcPerformanceService::isWorkingDay('2026-08-02'));
+check('Monday is a working day', BcPerformanceService::isWorkingDay('2026-08-03'));
+
+// Working-day maths, used to pro-rate a monthly target. August 2026 starts on a
+// Saturday, so the 3rd is the 2nd working day of the month.
+check('working days elapsed excludes Sundays', BcPerformanceService::workingDaysElapsed('2026-08-03') === 2,
+    (string) BcPerformanceService::workingDaysElapsed('2026-08-03'));
+check('August 2026 has 26 working days', BcPerformanceService::workingDaysInMonth('2026-08-15') === 26,
+    (string) BcPerformanceService::workingDaysInMonth('2026-08-15'));
+
+// Streak thresholds.
+check('1 miss is Level 1', BcPerformanceService::levelForStreak(1) === 'L1');
+check('2 misses is still Level 1', BcPerformanceService::levelForStreak(2) === 'L1');
+check('3 misses is Level 2', BcPerformanceService::levelForStreak(3) === 'L2');
+check('6 misses is still Level 2', BcPerformanceService::levelForStreak(6) === 'L2');
+check('7 misses is the final warning', BcPerformanceService::levelForStreak(7) === 'L3');
+check('L3 maps to the final-warning badge', BcPerformanceService::statusForLevel('L3') === 'final_warning');
+
+// ---- No targets set means no assessment ---------------------------------
+$db->query('DELETE FROM bc_warnings WHERE agent_id = ?', [$perfAgentId]);
+$db->query('DELETE FROM bc_targets WHERE agent_id = ?', [$perfAgentId]);
+check('no gaps when no targets exist', BcPerformanceService::gapsFor($perfAgentId, '2026-08-03') === []);
+
+// ---- Achievement is derived, not entered --------------------------------
+$db->query('DELETE FROM sss_enrollment WHERE agent_id = ?', [$perfAgentId]);
+$db->insert('sss_enrollment', [
+    'agent_id' => $perfAgentId, 'branch_id' => $perfBranchId, 'enrollment_date' => '2026-08-03',
+    'apy_count' => 2, 'pmjjby_count' => 1, 'pmsby_count' => 0, 'pmjdy_count' => 3,
+]);
+$rolled = BcPerformanceService::rollUpDay($perfAgentId, '2026-08-03');
+check('rollup reads APY from the SSS entry', $rolled['apy_done'] === 2, (string) $rolled['apy_done']);
+check('rollup reads PMJDY from the SSS entry', $rolled['pmjdy_done'] === 3);
+check('an SSS entry counts as having reported', $rolled['report_submitted'] === 1);
+
+$stored = $db->first('SELECT * FROM bc_daily_achievement WHERE agent_id = ? AND achievement_date = ?',
+    [$perfAgentId, '2026-08-03']);
+check('rollup is stored', $stored !== null && (int) $stored['apy_done'] === 2);
+
+// Re-running must overwrite, not accumulate - the cron may be re-run after a failure.
+BcPerformanceService::rollUpDay($perfAgentId, '2026-08-03');
+$rows = (int) $db->scalar('SELECT COUNT(*) FROM bc_daily_achievement WHERE agent_id = ? AND achievement_date = ?',
+    [$perfAgentId, '2026-08-03']);
+check('a second rollup does not duplicate the day', $rows === 1, (string) $rows);
+$again = $db->first('SELECT apy_done FROM bc_daily_achievement WHERE agent_id = ? AND achievement_date = ?',
+    [$perfAgentId, '2026-08-03']);
+check('a second rollup does not double the figure', (int) $again['apy_done'] === 2, (string) $again['apy_done']);
+
+// ---- Gaps, with a monthly target pro-rated ------------------------------
+$db->insert('bc_targets', [
+    'agent_id' => $perfAgentId, 'target_month' => '2026-08-01',
+    'apy_target' => 27, 'pmjjby_target' => 0, 'pmsby_target' => 0, 'pmjdy_target' => 0,
+    'npa_recovery_target' => 0, 'od2_renewal_target' => 0, 'daily_visit_target' => 5,
+]);
+
+// 27 APY over 27 working days = 1 per working day. By the 2nd working day the
+// agent should have 2, and has exactly 2 - so no APY gap.
+$gaps = BcPerformanceService::gapsFor($perfAgentId, '2026-08-03');
+check('a met pro-rated target is not a gap', !isset($gaps['apy']), json_encode(array_keys($gaps)));
+check('an unmet daily visit target is a gap', isset($gaps['visit']));
+check('the visit gap states the target', ($gaps['visit']['target'] ?? 0) === 5.0, json_encode($gaps['visit'] ?? null));
+
+// A target of zero is never assessed: nobody was asked for it.
+check('a zero target is not assessed', !isset($gaps['pmsby']));
+
+// ---- Streak escalation over consecutive working days --------------------
+$db->query('DELETE FROM bc_warnings WHERE agent_id = ?', [$perfAgentId]);
+
+// Six consecutive working days from Mon 3 Aug to Sat 8 Aug 2026.
+$streakDays = ['2026-08-03', '2026-08-04', '2026-08-05', '2026-08-06', '2026-08-07', '2026-08-08'];
+$levels = [];
+foreach ($streakDays as $day) {
+    BcPerformanceService::rollUpDay($perfAgentId, $day);
+    $dayGaps = BcPerformanceService::gapsFor($perfAgentId, $day);
+    $warning = BcPerformanceService::recordWarning($perfAgentId, 'visit', $dayGaps['visit'], $day);
+    $levels[] = $warning === null ? 'none' : $warning['level'] . ':' . $warning['streak'];
+}
+check('day 1 issues Level 1', $levels[0] === 'L1:1', $levels[0]);
+check('day 2 stays Level 1', $levels[1] === 'L1:2', $levels[1]);
+check('day 3 escalates to Level 2', $levels[2] === 'L2:3', $levels[2]);
+check('day 6 is still Level 2', $levels[5] === 'L2:6', $levels[5]);
+
+// Sunday 9 Aug is skipped; Monday 10 Aug is the 7th working-day miss.
+BcPerformanceService::rollUpDay($perfAgentId, '2026-08-10');
+$mondayGaps = BcPerformanceService::gapsFor($perfAgentId, '2026-08-10');
+$final = BcPerformanceService::recordWarning($perfAgentId, 'visit', $mondayGaps['visit'], '2026-08-10');
+check('a Sunday in between does not break the streak', $final !== null && $final['streak'] === 7,
+    json_encode($final === null ? null : $final['streak']));
+check('the 7th working-day miss is the final warning', $final !== null && $final['level'] === 'L3');
+
+// Re-running the same day must not issue a second warning or a second email.
+$duplicate = BcPerformanceService::recordWarning($perfAgentId, 'visit', $mondayGaps['visit'], '2026-08-10');
+check('the same day cannot be warned twice', $duplicate === null);
+$warnCount = (int) $db->scalar(
+    'SELECT COUNT(*) FROM bc_warnings WHERE agent_id = ? AND target_type = ? AND triggered_date = ?',
+    [$perfAgentId, 'visit', '2026-08-10']
+);
+check('only one warning row exists for that day', $warnCount === 1, (string) $warnCount);
+
+// ---- Standing and escalation flag ---------------------------------------
+$standing = BcPerformanceService::refreshStanding($perfAgentId, '2026-08-10');
+check('the badge reflects the worst open level', $standing['status'] === 'final_warning', $standing['status']);
+$userRow = $db->first('SELECT dashboard_status, escalation_flag FROM users WHERE id = ?', [$perfAgentId]);
+check('the badge is stored on the user', (string) $userRow['dashboard_status'] === 'final_warning');
+check('escalation is not raised on the first final warning', (int) $userRow['escalation_flag'] === 0,
+    (string) $userRow['escalation_flag']);
+
+// A final warning still open a week later raises the admin banner. The other
+// rows go first: the unique key would reject two warnings on the same date.
+$db->query("DELETE FROM bc_warnings WHERE agent_id = ? AND triggered_date <> '2026-08-10'", [$perfAgentId]);
+$db->query(
+    "UPDATE bc_warnings SET warning_level = 'L3', triggered_date = '2026-08-03' WHERE agent_id = ?",
+    [$perfAgentId]
+);
+$escalatedStanding = BcPerformanceService::refreshStanding($perfAgentId, '2026-08-12');
+check('an unimproved final warning escalates', $escalatedStanding['escalation_flag'] === 1,
+    json_encode($escalatedStanding));
+
+// Resolving the warnings clears the badge.
+$db->query("UPDATE bc_warnings SET status = 'resolved' WHERE agent_id = ?", [$perfAgentId]);
+$cleared = BcPerformanceService::refreshStanding($perfAgentId, '2026-08-12');
+check('resolving the warnings clears the badge', $cleared['status'] === 'normal', $cleared['status']);
+check('and clears the escalation flag', $cleared['escalation_flag'] === 0);
+
+// ---- Scorecard ----------------------------------------------------------
+$weights = BcPerformanceService::weights();
+check('score weights are seeded', count($weights) === 9, (string) count($weights));
+check('recovery is scored per 1,000 rupees', ($weights['npa_recovery']['divisor'] ?? 0) === 1000.0);
+check('an enrolment outweighs a visit',
+    ($weights['apy']['weight'] ?? 0) > ($weights['visits']['weight'] ?? 0));
+
+$scorecard = BcPerformanceService::scorecard('2026-08-01', '2026-08-31');
+check('the scorecard lists agents', count($scorecard) > 0, (string) count($scorecard));
+check('every row carries a score', !in_array(null, array_column($scorecard, 'total_score'), true));
+check('every row carries a rank', !in_array(null, array_column($scorecard, 'rank'), true));
+
+$scores = array_column($scorecard, 'total_score');
+$sorted = $scores;
+rsort($sorted);
+check('the scorecard is ranked by score descending', $scores === $sorted, json_encode($scores));
+check('the top row is rank 1', (int) $scorecard[0]['rank'] === 1);
+
+// Our agent enrolled 2 APY + 1 PMJJBY + 3 PMJDY on 3 Aug = 2*5 + 1*5 + 3*3 = 24,
+// plus whatever visits the seed produced. The point is that enrolments reached the
+// score at all, since they come from a different table to visits.
+$mine = null;
+foreach ($scorecard as $row) {
+    if ((int) $row['agent_id'] === $perfAgentId) {
+        $mine = $row;
+    }
+}
+check('the scored agent appears', $mine !== null);
+check('SSS enrolments reach the score', $mine !== null && (int) $mine['apy'] === 2, json_encode($mine['apy'] ?? null));
+check('the score is greater than zero', $mine !== null && (float) $mine['total_score'] > 0);
+
+// Dense ranking: equal scores share a rank rather than being ordered arbitrarily.
+$ranks = array_column($scorecard, 'rank');
+$dense = true;
+for ($i = 1, $n = count($scorecard); $i < $n; $i++) {
+    $sameScore = (float) $scorecard[$i]['total_score'] === (float) $scorecard[$i - 1]['total_score'];
+    if ($sameScore && (int) $ranks[$i] !== (int) $ranks[$i - 1]) {
+        $dense = false;
+    }
+}
+check('agents on the same score share a rank', $dense);
+
+// ---------------------------------------------------------------------------
+section('Location tracking: consent, bounds and retention');
+// ---------------------------------------------------------------------------
+// This system tracks staff. That was an explicit decision, and these assertions
+// are the obligations that come with it - enforced in code, not in a handbook.
+
+use App\Services\TrackingService;
+
+$trackAgent = $agent1Id;
+$db->query('DELETE FROM bc_location_logs WHERE agent_id = ?', [$trackAgent]);
+$db->query('DELETE FROM tracking_consents WHERE user_id = ?', [$trackAgent]);
+
+// ---- Nothing is recorded before the notice is acknowledged --------------
+check('an agent starts without consent', !TrackingService::hasConsented($trackAgent));
+
+$refused = false;
+try {
+    TrackingService::record($trackAgent, ['latitude' => 26.9124, 'longitude' => 75.7873]);
+} catch (\Throwable $e) {
+    $refused = str_contains($e->getMessage(), 'acknowledged');
+}
+check('recording is refused without consent', $refused);
+check('and nothing was written', (int) $db->scalar(
+    'SELECT COUNT(*) FROM bc_location_logs WHERE agent_id = ?', [$trackAgent]) === 0);
+
+// ---- The notice itself must say the things that make it a notice --------
+$notice = TrackingService::notice();
+check('the notice is versioned', $notice['version'] === TrackingService::NOTICE_VERSION);
+foreach (['english' => 'records your location', 'hindi' => 'लोकेशन रिकॉर्ड करता है'] as $lang => $needle) {
+    check("the $lang notice states that location is recorded", str_contains($notice[$lang], $needle));
+}
+check('the notice says how long it is kept', str_contains($notice['english'], 'then it is deleted automatically'));
+check('the notice says who can see it', str_contains($notice['english'], 'Who can see it'));
+check('the notice explains withdrawal', str_contains($notice['english'], 'withdraw this consent'));
+check('the notice says viewing is logged', str_contains($notice['english'], 'it is logged'));
+check('the Hindi notice explains withdrawal', str_contains($notice['hindi'], 'सहमति वापस'));
+
+// ---- After acknowledgement, points are stored --------------------------
+TrackingService::recordConsent($trackAgent, 'Integration test device', '127.0.0.1');
+check('consent is recorded', TrackingService::hasConsented($trackAgent));
+check('the acknowledgement is audited', (int) $db->scalar(
+    "SELECT COUNT(*) FROM audit_logs WHERE action = 'consent' AND entity_id = ?",
+    [(string) $trackAgent]) >= 1);
+
+check('a point is accepted after consent',
+    TrackingService::record($trackAgent, ['latitude' => 26.9124, 'longitude' => 75.7873, 'accuracy_m' => 12]));
+$point = $db->first('SELECT * FROM bc_location_logs WHERE agent_id = ? ORDER BY id DESC LIMIT 1', [$trackAgent]);
+check('the coordinate is stored', $point !== null && abs((float) $point['latitude'] - 26.9124) < 0.0001);
+check('accuracy is stored', $point !== null && (int) $point['accuracy_m'] === 12);
+check('on_duty defaults to true', $point !== null && (int) $point['on_duty'] === 1);
+check('the server clock is recorded separately', $point !== null && $point['received_at'] !== null);
+
+// ---- Rate limiting: a device waking up must not flood the table --------
+$flood = TrackingService::record($trackAgent, ['latitude' => 26.9125, 'longitude' => 75.7874]);
+check('a second point within a minute is dropped', $flood === false);
+check('and the table did not grow', (int) $db->scalar(
+    'SELECT COUNT(*) FROM bc_location_logs WHERE agent_id = ?', [$trackAgent]) === 1);
+
+// ---- Obviously wrong coordinates are refused ---------------------------
+foreach ([
+    'null island (a failed fix)' => [0.0, 0.0],
+    'latitude out of range'      => [91.0, 75.0],
+    'longitude out of range'     => [26.0, 181.0],
+] as $label => [$lat, $lng]) {
+    check("$label is not plausible", !TrackingService::plausible($lat, $lng));
+}
+check('a real Jaipur coordinate is plausible', TrackingService::plausible(26.9124, 75.7873));
+
+$rejected = false;
+try {
+    $db->query('DELETE FROM bc_location_logs WHERE agent_id = ?', [$trackAgent]);
+    TrackingService::record($trackAgent, ['latitude' => 0.0, 'longitude' => 0.0]);
+} catch (\Throwable $e) {
+    $rejected = str_contains($e->getMessage(), 'valid coordinate');
+}
+check('a failed fix is rejected rather than stored', $rejected);
+
+// ---- A wrong device clock cannot file points in the future -------------
+$db->query('DELETE FROM bc_location_logs WHERE agent_id = ?', [$trackAgent]);
+TrackingService::record($trackAgent, [
+    'latitude' => 26.9124, 'longitude' => 75.7873, 'logged_at' => '2030-01-01 10:00:00',
+]);
+$future = $db->first('SELECT logged_at FROM bc_location_logs WHERE agent_id = ? ORDER BY id DESC LIMIT 1', [$trackAgent]);
+check('a future device timestamp is replaced with now',
+    $future !== null && strtotime((string) $future['logged_at']) <= time() + 60,
+    (string) ($future['logged_at'] ?? ''));
+
+// ---- Viewing somebody else's trail is audited -------------------------
+$auditBefore = (int) $db->scalar("SELECT COUNT(*) FROM audit_logs WHERE action = 'view_location'");
+TrackingService::trailFor($trackAgent, date('Y-m-d'), $trackAgent);
+check('an agent viewing their own trail is not logged as surveillance',
+    (int) $db->scalar("SELECT COUNT(*) FROM audit_logs WHERE action = 'view_location'") === $auditBefore);
+
+TrackingService::trailFor($trackAgent, date('Y-m-d'), 1);
+check('somebody else viewing the trail is audited',
+    (int) $db->scalar("SELECT COUNT(*) FROM audit_logs WHERE action = 'view_location'") === $auditBefore + 1);
+
+// ---- Withdrawal stops collection immediately --------------------------
+TrackingService::withdrawConsent($trackAgent);
+check('consent can be withdrawn', !TrackingService::hasConsented($trackAgent));
+$afterWithdrawal = false;
+try {
+    TrackingService::record($trackAgent, ['latitude' => 26.92, 'longitude' => 75.79]);
+} catch (\Throwable) {
+    $afterWithdrawal = true;
+}
+check('recording stops the moment consent is withdrawn', $afterWithdrawal);
+check('withdrawal is audited', (int) $db->scalar(
+    "SELECT COUNT(*) FROM audit_logs WHERE action = 'consent' AND summary LIKE '%Withdrew%'") >= 1);
+
+// Re-acknowledging must work rather than collide with the unique key.
+TrackingService::recordConsent($trackAgent, 'Integration test device', '127.0.0.1');
+check('an agent can acknowledge again after withdrawing', TrackingService::hasConsented($trackAgent));
+
+// ---- Retention: old points are purged --------------------------------
+$db->query('DELETE FROM bc_location_logs WHERE agent_id = ?', [$trackAgent]);
+foreach ([200, 120, 5, 1] as $daysAgo) {
+    $db->insert('bc_location_logs', [
+        'agent_id'  => $trackAgent,
+        'latitude'  => 26.9124,
+        'longitude' => 75.7873,
+        'logged_at' => date('Y-m-d H:i:s', strtotime('-' . $daysAgo . ' days')),
+    ]);
+}
+check('four points exist before the purge', (int) $db->scalar(
+    'SELECT COUNT(*) FROM bc_location_logs WHERE agent_id = ?', [$trackAgent]) === 4);
+
+$purged = TrackingService::purge(90);
+check('the purge removed the two points past 90 days', $purged === 2, (string) $purged);
+check('recent points survive', (int) $db->scalar(
+    'SELECT COUNT(*) FROM bc_location_logs WHERE agent_id = ?', [$trackAgent]) === 2);
+check('retention defaults to 90 days', TrackingService::retentionDays() === 90,
+    (string) TrackingService::retentionDays());
+
+// ---- The audit ENUM must actually accept what the code writes ---------
+// Logger::audit swallows its own failures so that a logging problem cannot break
+// the action being logged - which means an action name missing from the ENUM never
+// raises anything, it just silently never records. That is how the customer-sheet
+// export came to be "audited" without a single row ever appearing.
+$sheetLeadForAudit = $db->first("SELECT id FROM loan_accounts LIMIT 1");
+$auditActions = ['export', 'consent', 'view_location', 'purge'];
+foreach ($auditActions as $action) {
+    $ok = true;
+    try {
+        $db->insert('audit_logs', [
+            'user_id' => 1, 'user_name' => 'Audit ENUM check', 'action' => $action,
+            'entity_type' => 'loan_account', 'entity_id' => (string) $sheetLeadForAudit['id'],
+            'summary' => 'ENUM acceptance check',
+        ]);
+    } catch (\Throwable) {
+        $ok = false;
+    }
+    check("audit_logs accepts the '$action' action", $ok);
+}
+
+// ---------------------------------------------------------------------------
+section('Search (including encrypted columns)');
+
+$byAccount = LoanAccount::paginate(['search' => 'LN1001'], 'created_at', 'DESC', 1, 25);
+check('search by loan account number', $byAccount->total === 1, 'total=' . $byAccount->total);
+
+$byName = LoanAccount::paginate(['search' => 'Ramesh'], 'created_at', 'DESC', 1, 25);
+check('search by customer name', $byName->total >= 1);
+
+$byVillage = LoanAccount::paginate(['search' => 'Kotri'], 'created_at', 'DESC', 1, 25);
+check('search by village', $byVillage->total >= 2, 'total=' . $byVillage->total);
+
+$byMobile = LoanAccount::paginate(['search' => '9876543210'], 'created_at', 'DESC', 1, 25);
+check('search by encrypted mobile (HMAC)', $byMobile->total === 1, 'total=' . $byMobile->total);
+
+$byMobileFormatted = LoanAccount::paginate(['search' => '+91 98765 43210'], 'created_at', 'DESC', 1, 25);
+check('search by formatted mobile normalises', $byMobileFormatted->total === 1, 'total=' . $byMobileFormatted->total);
+
+$byAadhaar = LoanAccount::paginate(['search' => '123456789012'], 'created_at', 'DESC', 1, 25);
+check('search by encrypted Aadhaar (HMAC)', $byAadhaar->total === 1, 'total=' . $byAadhaar->total);
+
+// ---------------------------------------------------------------------------
+section('Facility filter (KCC vs OD-2), the same enum the renewal worklists use');
+
+// An unrecognised value must be ignored rather than turned into a WHERE clause that
+// matches nothing or, worse, one built from unvalidated input. Checked here, ahead of
+// the KCC/OD-2 fixtures below, because it needs no facility-typed account to exist.
+$allLeads = LoanAccount::paginate([], 'created_at', 'DESC', 1, 500);
+$bogus = LoanAccount::paginate(['facility_type' => 'drop table users'], 'created_at', 'DESC', 1, 500);
+check('an unrecognised facility_type is ignored rather than filtering anything out',
+    $bogus->total === $allLeads->total,
+    "bogus={$bogus->total} all={$allLeads->total}");
+
+check('filter by branch', LoanAccount::paginate(['branch_id' => $branchBId], 'created_at', 'DESC', 1, 25)->total === 1);
+check('filter by status pending', LoanAccount::paginate(['status' => 'pending'], 'created_at', 'DESC', 1, 25)->total >= 4);
+check('filter unassigned', LoanAccount::paginate(['unassigned' => true], 'created_at', 'DESC', 1, 25)->total >= 1);
+check('filter npa_only', LoanAccount::paginate(['npa_only' => true], 'created_at', 'DESC', 1, 25)->total >= 3);
+check('statusCounts returns breakdown', (LoanAccount::statusCounts([])['all'] ?? 0) >= 5);
+check('sort whitelist rejects injection',
+    LoanAccount::paginate([], 'id; DROP TABLE users', 'DESC', 1, 5)->total >= 1);
+check('users table survived injection attempt', (int) $db->scalar('SELECT COUNT(*) FROM users') > 0);
+check('villages() lists distinct', count(LoanAccount::villages()) >= 3);
+check('loanTypes() lists distinct', count(LoanAccount::loanTypes()) >= 3);
+check('findWithPii decrypts', LoanAccount::findWithPii((int) $ln1001['id'])['mobile'] === '9876543210');
+
+// ---------------------------------------------------------------------------
+section('Assignment / reassignment / transfer');
+
+$ln1002 = LoanAccount::findByNumber('LN1002');
+$ln1003 = LoanAccount::findByNumber('LN1003');
+
+$assign = AssignmentService::assign([(int) $ln1002['id']], $agent2Id);
+check('reassign to agent 2', $assign['updated'] === 1, json_encode($assign));
+check('assignment persisted', (int) LoanAccount::findByNumber('LN1002')['assigned_agent_id'] === $agent2Id);
+check('reassign timeline event appended',
+    (int) $db->scalar("SELECT COUNT(*) FROM visit_history WHERE loan_account_id = ? AND event_type IN ('assigned','reassigned')",
+        [(int) $ln1002['id']]) >= 1);
+
+$noop = AssignmentService::assign([(int) $ln1002['id']], $agent2Id);
+check('re-assigning to same agent is a no-op', $noop['updated'] === 0 && $noop['skipped'] === 1);
+
+$crossBranch = AssignmentService::assign([(int) $ln1003['id']], $agent1Id);
+check('cross-branch assignment blocked', $crossBranch['updated'] === 0, json_encode($crossBranch));
+check('cross-branch gives a clear message', str_contains(implode(' ', $crossBranch['messages']), 'different branch'));
+
+$transfer = AssignmentService::transfer([(int) $ln1003['id']], $branchAId, true);
+check('transfer to branch A', $transfer['updated'] === 1, json_encode($transfer));
+$ln1003b = LoanAccount::findByNumber('LN1003');
+check('branch changed', (int) $ln1003b['branch_id'] === $branchAId);
+check('customer branch followed the loan',
+    (int) $db->scalar('SELECT branch_id FROM customers WHERE id = ?', [(int) $ln1003b['customer_id']]) === $branchAId);
+check('transfer timeline event appended',
+    (int) $db->scalar("SELECT COUNT(*) FROM visit_history WHERE loan_account_id = ? AND event_type = 'transferred'",
+        [(int) $ln1003b['id']]) === 1);
+
+$afterTransfer = AssignmentService::assign([(int) $ln1003b['id']], $agent1Id);
+check('assignment works after transfer', $afterTransfer['updated'] === 1, json_encode($afterTransfer));
+
+$unassign = AssignmentService::unassign([(int) $ln1003b['id']]);
+check('unassign works', $unassign['updated'] === 1);
+check('agent cleared', LoanAccount::findByNumber('LN1003')['assigned_agent_id'] === null);
+AssignmentService::assign([(int) $ln1003b['id']], $agent1Id);
+
+// ---------------------------------------------------------------------------
+section('Visit report submission (append-only)');
+
+$agentRow = User::find($agent1Id);
+$agentCtx = ['id' => $agent1Id, 'name' => (string) $agentRow['name'], 'bc_code' => (string) $agentRow['bc_code'], 'branch_id' => $branchAId];
+$leadId = (int) $ln1001['id'];
+
+$visit1 = VisitService::submit([
+    'loan_account_id' => $leadId,
+    'visit_date'      => date('Y-m-d'),
+    'visit_time'      => '10:30',
+    'village'         => 'Kotri',
+    'customer_met'    => '1',
+    'borrower_alive'  => '1',
+    'same_address'    => '1',
+    'occupation'      => 'agriculture',
+    'not_ready'       => '1',
+    'reason_crop_loss' => '1',
+    'rec_regular_followup' => '1',
+    'remarks'         => 'Crop failed this season. Will revisit after harvest.',
+    'client_uuid'     => 'aaaaaaaa-1111-2222-3333-444444444444',
+    'app_version'     => '1.0.0',
+], $agentCtx);
+
+check('visit 1 created', $visit1['visit_id'] > 0);
+check('no promise created without amount/date', $visit1['promise_id'] === null);
+check('not a duplicate', $visit1['duplicate'] === false);
+check('visit_count incremented', (int) LoanAccount::find($leadId)['visit_count'] === 1);
+check('status -> followup from recommendation', (string) LoanAccount::find($leadId)['current_status'] === 'followup',
+    (string) LoanAccount::find($leadId)['current_status']);
+check('last_visit_at set', LoanAccount::find($leadId)['last_visit_at'] !== null);
+check('visit timeline event appended',
+    (int) $db->scalar("SELECT COUNT(*) FROM visit_history WHERE loan_account_id = ? AND event_type = 'visit'", [$leadId]) === 1);
+check('borrower snapshot captured',
+    (string) VisitReport::find($visit1['visit_id'])['customer_name'] === 'Ramesh Kumar');
+check('loan snapshot captured',
+    abs((float) VisitReport::find($visit1['visit_id'])['outstanding_amount'] - 150000.0) < 0.01);
+check('PII snapshot decrypts on the visit',
+    VisitReport::findWithPii($visit1['visit_id'])['mobile'] === '9876543210');
+check('occupation enum stored', (string) VisitReport::find($visit1['visit_id'])['occupation'] === 'agriculture');
+
+// Idempotency
+$dupe = VisitService::submit([
+    'loan_account_id' => $leadId,
+    'visit_date'      => date('Y-m-d'),
+    'visit_time'      => '10:30',
+    'client_uuid'     => 'aaaaaaaa-1111-2222-3333-444444444444',
+], $agentCtx);
+check('duplicate client_uuid is idempotent', $dupe['duplicate'] === true && $dupe['visit_id'] === $visit1['visit_id']);
+check('visit_count unchanged after duplicate', (int) LoanAccount::find($leadId)['visit_count'] === 1);
+
+// Visit 2 with a promise + photos
+$png = base64_encode((string) file_get_contents(__DIR__ . '/fixtures/pixel.png'));
+$visit2 = VisitService::submit([
+    'loan_account_id' => $leadId,
+    'visit_date'      => date('Y-m-d'),
+    'visit_time'      => '15:45',
+    'village'         => 'Kotri',
+    'customer_met'    => '1',
+    'ready_to_pay'    => '1',
+    'promise_amount'  => '25,000',
+    'promise_date'    => date('Y-m-d', strtotime('+10 days')),
+    'occupation'      => 'dairy',
+    'rec_recovery_possible' => '1',
+    'remarks'         => 'Agreed to pay after selling milk stock.',
+    'client_uuid'     => 'bbbbbbbb-1111-2222-3333-444444444444',
+    'customer_photo_base64'     => $png,
+    'house_photo_base64'        => $png,
+], $agentCtx);
+
+check('visit 2 created', $visit2['visit_id'] > 0 && $visit2['visit_id'] !== $visit1['visit_id']);
+check('visit 2 warnings empty', $visit2['warnings'] === [], json_encode($visit2['warnings']));
+check('promise created', $visit2['promise_id'] !== null);
+check('promise amount "25,000" parsed', abs((float) Promise::find((int) $visit2['promise_id'])['promise_amount'] - 25000.0) < 0.01);
+check('2 photos saved', $visit2['media']['photos'] === 2, json_encode($visit2['media']));
+check('photo files exist on disk', (function () use ($visit2, $workDir): bool {
+    foreach (VisitReport::photos($visit2['visit_id']) as $photo) {
+        if (!is_file($workDir . '/uploads/' . $photo['file_path'])) {
+            return false;
+        }
+    }
+    return true;
+})());
+// Signatures used to be counted here. Nothing captures one now - the printed report
+// carries empty ruled boxes - so the media counter must not report a kind it no
+// longer stores, or the app shows "2 attachments" for a report that has none.
+check('the media counter has no signature bucket left',
+    !array_key_exists('signatures', $visit2['media']), json_encode($visit2['media']));
+check('visit_count now 2', (int) LoanAccount::find($leadId)['visit_count'] === 2);
+check('status -> promise', (string) LoanAccount::find($leadId)['current_status'] === 'promise');
+check('next_followup_date = promise date',
+    (string) LoanAccount::find($leadId)['next_followup_date'] === date('Y-m-d', strtotime('+10 days')));
+check('promise_created timeline event',
+    (int) $db->scalar("SELECT COUNT(*) FROM visit_history WHERE loan_account_id = ? AND event_type = 'promise_created'", [$leadId]) === 1);
+check('visit 1 was NOT overwritten (append-only)',
+    (int) $db->scalar('SELECT COUNT(*) FROM visit_reports WHERE loan_account_id = ?', [$leadId]) === 2);
+check('visit 1 remarks intact',
+    str_contains((string) VisitReport::find($visit1['visit_id'])['remarks'], 'Crop failed'));
+check('history newest first', (function () use ($leadId, $visit2): bool {
+    $rows = VisitReport::forLoanAccount($leadId);
+    return count($rows) === 2 && (int) $rows[0]['id'] === $visit2['visit_id'];
+})());
+check('photo gallery aggregates per loan account', count(VisitReport::photosForLoanAccount($leadId)) === 2);
+check('manager notified of promise', Notification::unreadCount($managerId) > 0);
+
+// Legal recommendation drives status
+$visit3 = VisitService::submit([
+    'loan_account_id'  => (int) $ln1002['id'],
+    'visit_date'       => date('Y-m-d'),
+    'visit_time'       => '11:00',
+    'house_locked'     => '1',
+    'rec_legal_action' => '1',
+    'remarks'          => 'House locked repeatedly, recommend legal action.',
+], ['id' => $agent2Id, 'name' => 'Sunita Agent', 'bc_code' => 'BC-002', 'branch_id' => $branchAId]);
+check('visit 3 created', $visit3['visit_id'] > 0);
+check('status -> legal', (string) LoanAccount::find((int) $ln1002['id'])['current_status'] === 'legal');
+
+check('timeline ordering + labels resolve', (function () use ($leadId): bool {
+    $timeline = Timeline::forLoanAccount($leadId);
+    return count($timeline) >= 4 && isset($timeline[0]['event_meta']['label']);
+})());
+
+// ---------------------------------------------------------------------------
+section('Promise lifecycle');
+
+$promiseId = (int) $visit2['promise_id'];
+check('promise pending', (string) Promise::find($promiseId)['status'] === 'pending');
+check('promise listed for loan account', count(Promise::forLoanAccount($leadId)) === 1);
+check('promise statusCounts', Promise::statusCounts(null)['pending'] >= 1);
+
+check('settle as kept', Promise::settle($promiseId, 'kept', 1, 'System Administrator', 'Paid in full'));
+check('promise now kept', (string) Promise::find($promiseId)['status'] === 'kept');
+check('promise_kept timeline event',
+    (int) $db->scalar("SELECT COUNT(*) FROM visit_history WHERE promise_id = ? AND event_type = 'promise_kept'", [$promiseId]) === 1);
+
+// Broken promise pushes the lead back to follow-up.
+$visit4 = VisitService::submit([
+    'loan_account_id' => $leadId,
+    'visit_date'      => date('Y-m-d'),
+    'visit_time'      => '16:00',
+    'customer_met'    => '1',
+    'promise_amount'  => '10000',
+    'promise_date'    => date('Y-m-d', strtotime('-2 days')),
+    'remarks'         => 'Second promise.',
+], $agentCtx);
+$promise2Id = (int) $visit4['promise_id'];
+check('second promise created', $promise2Id > 0);
+check('overdue promises detected', count(Promise::overdue(null, 10)) >= 1);
+check('settle as broken', Promise::settle($promise2Id, 'broken', 1, 'System Administrator', 'Did not pay'));
+check('lead pushed back to followup', (string) LoanAccount::find($leadId)['current_status'] === 'followup',
+    (string) LoanAccount::find($leadId)['current_status']);
+check('invalid settle status rejected', Promise::settle($promise2Id, 'nonsense', 1, 'x', null) === false);
+
+$promisePage = Promise::paginate(['status' => 'kept'], 1, 25);
+check('promise pagination filters by status', $promisePage->total >= 1);
+
+// ---------------------------------------------------------------------------
+section('Close / reopen');
+
+$closed = AssignmentService::setStatus([(int) $ln1003b['id']], 'closed', 'Fully recovered');
+check('lead closed', $closed['updated'] === 1);
+check('closed_at set', LoanAccount::find((int) $ln1003b['id'])['closed_at'] !== null);
+check('closed timeline event',
+    (int) $db->scalar("SELECT COUNT(*) FROM visit_history WHERE loan_account_id = ? AND event_type = 'closed'", [(int) $ln1003b['id']]) === 1);
+
+$visitOnClosed = VisitService::submit([
+    'loan_account_id' => (int) $ln1003b['id'],
+    'visit_date'      => date('Y-m-d'),
+    'visit_time'      => '12:00',
+    'customer_met'    => '1',
+    'remarks'         => 'Courtesy visit after closure.',
+], $agentCtx);
+check('visit on closed lead still records', $visitOnClosed['visit_id'] > 0);
+check('closed lead is not silently reopened',
+    (string) LoanAccount::find((int) $ln1003b['id'])['current_status'] === 'closed');
+
+$reopened = AssignmentService::setStatus([(int) $ln1003b['id']], 'pending', 'Reopened after dispute');
+check('lead reopened', $reopened['updated'] === 1);
+check('reopened timeline event',
+    (int) $db->scalar("SELECT COUNT(*) FROM visit_history WHERE loan_account_id = ? AND event_type = 'reopened'", [(int) $ln1003b['id']]) === 1);
+
+// ---------------------------------------------------------------------------
+section('Every report type + exports');
+
+// One account of each renewable facility, so the two renewal worklists have something to
+// render. Imported rather than inserted, because the facility is DERIVED from the loan
+// type the sheet carries - so this also proves the derivation end to end rather than
+// trusting a unit test of the parser.
+$facilityCsv = $workDir . '/facilities.csv';
+file_put_contents($facilityCsv, implode("\n", [
+    'Branch,Loan Account Number,Customer Name,Village,Loan Type,Outstanding Amount,Renewal Due Date',
+    'BR001,KCCACC001,Kcc Borrower,Kotri,Kisan Credit Card,90000,' . date('d/m/Y', strtotime('+12 days')),
+    'BR001,OD2ACC001,Od2 Borrower,Kotri,OD-2,140000,' . date('d/m/Y', strtotime('-9 days')),
+    // A plain overdraft is deliberately NOT read as the OD-2 facility, so this one must
+    // land in neither worklist.
+    'BR001,ODXACC001,Plain Od Borrower,Kotri,Overdraft,50000,' . date('d/m/Y', strtotime('+20 days')),
+]));
+ImportService::run(
+    ['name' => 'facilities.csv', 'tmp_name' => $facilityCsv, 'error' => UPLOAD_ERR_OK, 'size' => filesize($facilityCsv)],
+    null, null, 1, 'System Administrator'
+);
+
+check('a KCC loan type is recognised as the KCC facility',
+    (string) LoanAccount::findByNumber('KCCACC001')['facility_type'] === 'kcc',
+    (string) (LoanAccount::findByNumber('KCCACC001')['facility_type'] ?? 'null'));
+check('an OD-2 loan type is recognised as the OD-2 facility',
+    (string) LoanAccount::findByNumber('OD2ACC001')['facility_type'] === 'od2',
+    (string) (LoanAccount::findByNumber('OD2ACC001')['facility_type'] ?? 'null'));
+check('a plain overdraft is left undetermined rather than guessed into a worklist',
+    LoanAccount::findByNumber('ODXACC001')['facility_type'] === null,
+    (string) (LoanAccount::findByNumber('ODXACC001')['facility_type'] ?? 'null'));
+
+// The facility_type filter on the leads list/API - the same enum the two worklists
+// above filter on - needs these same fixtures, so it is checked here rather than
+// earlier in the file, before either account existed.
+$kccOnly = LoanAccount::paginate(['facility_type' => 'kcc'], 'created_at', 'DESC', 1, 25);
+$kccNumbers = array_column($kccOnly->items, 'loan_account_number');
+check('facility_type=kcc returns the KCC account', in_array('KCCACC001', $kccNumbers, true));
+check('facility_type=kcc excludes the OD-2 account', !in_array('OD2ACC001', $kccNumbers, true));
+
+$od2Only = LoanAccount::paginate(['facility_type' => 'od2'], 'created_at', 'DESC', 1, 25);
+$od2Numbers = array_column($od2Only->items, 'loan_account_number');
+check('facility_type=od2 returns the OD-2 account', in_array('OD2ACC001', $od2Numbers, true));
+check('facility_type=od2 excludes the KCC account', !in_array('KCCACC001', $od2Numbers, true));
+
+// The whole point of splitting them: each worklist holds its own facility and nothing
+// else. One combined list meant forty OD-2 renewals buried inside three hundred KCC ones.
+$kccList = ReportService::build('kcc-renewal', ['date_from' => date('Y-m-d', strtotime('-1 year')), 'date_to' => date('Y-m-d')]);
+$od2List = ReportService::build('od2-renewal', ['date_from' => date('Y-m-d', strtotime('-1 year')), 'date_to' => date('Y-m-d')]);
+
+$kccAccounts = array_column($kccList['rows'], 'loan_account_number');
+$od2Accounts = array_column($od2List['rows'], 'loan_account_number');
+
+check('the KCC worklist holds the KCC account', in_array('KCCACC001', $kccAccounts, true));
+check('and not the OD-2 one', !in_array('OD2ACC001', $kccAccounts, true));
+check('the OD-2 worklist holds the OD-2 account', in_array('OD2ACC001', $od2Accounts, true));
+check('and not the KCC one', !in_array('KCCACC001', $od2Accounts, true));
+check('neither claims the plain overdraft',
+    !in_array('ODXACC001', $kccAccounts, true) && !in_array('ODXACC001', $od2Accounts, true));
+check('the two lists do not overlap at all',
+    array_intersect($kccAccounts, $od2Accounts) === []);
+
+// A lapsed renewal is stated in words, because "-9" in a days column reads as a typo.
+$od2Row = null;
+foreach ($od2List['rows'] as $row) {
+    if ((string) $row['loan_account_number'] === 'OD2ACC001') {
+        $od2Row = $row;
+        break;
+    }
+}
+check('an overdue renewal says so in words',
+    $od2Row !== null && str_contains((string) $od2Row['renewal_state'], 'overdue'),
+    (string) ($od2Row['renewal_state'] ?? 'null'));
+check('and the summary counts it', str_contains(
+    implode(' ', array_map(
+        static fn (array $s): string => $s['label'] . '=' . $s['value'],
+        $od2List['summary']
+    )),
+    'Renewal overdue=1'
+), json_encode($od2List['summary']));
+
+// A closed account never needs renewing, so it must not sit in a worklist somebody works
+// down by hand.
+$db->update('loan_accounts', ['current_status' => 'closed'], ['loan_account_number' => 'KCCACC001']);
+$kccAfterClose = ReportService::build('kcc-renewal', ['date_from' => date('Y-m-d', strtotime('-1 year')), 'date_to' => date('Y-m-d')]);
+check('a closed account drops out of the worklist',
+    !in_array('KCCACC001', array_column($kccAfterClose['rows'], 'loan_account_number'), true));
+$db->update('loan_accounts', ['current_status' => 'pending'], ['loan_account_number' => 'KCCACC001']);
+
+// An account with no renewal date is the one nobody is tracking, so it is included and
+// sorted last rather than hidden - which would make the list look complete.
+$db->update('loan_accounts', ['ckcc_renewal_due_date' => null], ['loan_account_number' => 'KCCACC001']);
+$kccNoDate = ReportService::build('kcc-renewal', ['date_from' => date('Y-m-d', strtotime('-1 year')), 'date_to' => date('Y-m-d')]);
+$noDateAccounts = array_column($kccNoDate['rows'], 'loan_account_number');
+check('an account with no renewal date is still listed',
+    in_array('KCCACC001', $noDateAccounts, true));
+check('and sorted last, after everything with a date',
+    array_search('KCCACC001', $noDateAccounts, true) === count($noDateAccounts) - 1,
+    implode(',', $noDateAccounts));
+$db->update(
+    'loan_accounts',
+    ['ckcc_renewal_due_date' => date('Y-m-d', strtotime('+12 days'))],
+    ['loan_account_number' => 'KCCACC001']
+);
+
+$filters = [
+    'date'      => date('Y-m-d'),
+    'date_from' => date('Y-m-d', strtotime('-30 days')),
+    'date_to'   => date('Y-m-d'),
+    'month'     => date('Y-m'),
+    'week'      => date('o-\WW'),
+];
+
+foreach (array_keys(ReportService::TYPES) as $type) {
+    try {
+        $report = ReportService::build($type, $filters);
+
+        check("report [{$type}] builds", isset($report['columns'], $report['rows'], $report['title']));
+        check("report [{$type}] has columns", count($report['columns']) > 0);
+        check("report [{$type}] has rows", count($report['rows']) > 0, 'rows=' . count($report['rows']));
+
+        // Every declared column must exist on every row.
+        $missing = [];
+        foreach ($report['rows'] as $row) {
+            foreach ($report['columns'] as $column) {
+                if (!array_key_exists($column['key'], $row)) {
+                    $missing[] = $column['key'];
+                }
+            }
+        }
+        check("report [{$type}] rows cover all columns", $missing === [], implode(',', array_unique($missing)));
+
+        [$xlsx, $xlsxName, $xlsxMime] = ReportService::toExcel($report);
+        check("report [{$type}] Excel export", strlen($xlsx) > 800 && str_starts_with($xlsx, "PK\x03\x04"), 'bytes=' . strlen($xlsx));
+        file_put_contents($workDir . '/' . $xlsxName, $xlsx);
+
+        [$pdf, $pdfName, $pdfMime] = ReportService::toPdf($report);
+        check("report [{$type}] PDF export", str_starts_with($pdf, '%PDF-1.4') && str_contains($pdf, '%%EOF'), 'bytes=' . strlen($pdf));
+        file_put_contents($workDir . '/' . $pdfName, $pdf);
+    } catch (\Throwable $e) {
+        check("report [{$type}] builds", false, $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine());
+    }
+}
+
+// Scoped report (branch manager view)
+$scoped = ReportService::build('branch', array_merge($filters, ['branch_id' => $branchAId]));
+check('branch-scoped report returns only that branch', count($scoped['rows']) === 1, 'rows=' . count($scoped['rows']));
+check('report totals row present', $scoped['totals'] !== null);
+check('invalid report type rejected', ReportService::isValidType('nope') === false);
+
+// Empty result set must not explode.
+$empty = ReportService::build('daily', ['date' => '1999-01-01']);
+check('empty report builds', $empty['rows'] === [] && $empty['totals'] === null);
+[$emptyPdf] = ReportService::toPdf($empty);
+check('empty report PDF renders', str_starts_with($emptyPdf, '%PDF'));
+[$emptyXlsx] = ReportService::toExcel($empty);
+check('empty report Excel renders', str_starts_with($emptyXlsx, "PK\x03\x04"));
+
+// ---------------------------------------------------------------------------
+section('Dashboard');
+
+$dash = DashboardService::build(null);
+check('dashboard cards', ($dash['cards']['total_leads'] ?? 0) >= 5, json_encode($dash['cards']['total_leads'] ?? null));
+check('dashboard counts visits', ($dash['cards']['total_visits'] ?? 0) >= 4);
+check('dashboard visits_today', ($dash['cards']['visits_today'] ?? 0) >= 4);
+check('dashboard outstanding is numeric', is_float($dash['cards']['outstanding']));
+check('dashboard status breakdown has 6 statuses', count($dash['status_breakdown']) === 6);
+check('dashboard top agents', count($dash['top_agents']) >= 2);
+check('dashboard branch rows (super admin)', count($dash['branch_rows']) >= 2);
+check('dashboard trend zero-filled to 14 days', count($dash['visit_trend']) === 14);
+check('dashboard promise counts', ($dash['promise_counts']['kept'] ?? 0) >= 1);
+check('dashboard recent visits', count($dash['recent_visits']) >= 4);
+check('dashboard loan type split', count($dash['loan_type_split']) >= 3);
+
+$dashScoped = DashboardService::build($branchAId);
+check('scoped dashboard hides branch table', $dashScoped['branch_rows'] === []);
+check('scoped dashboard has fewer/equal leads',
+    ($dashScoped['cards']['total_leads'] ?? 0) <= ($dash['cards']['total_leads'] ?? 0));
+
+$agentDash = DashboardService::forAgent($agent1Id);
+check('agent dashboard leads', ($agentDash['leads']['total'] ?? 0) >= 2, json_encode($agentDash['leads']));
+check('agent dashboard visits', ($agentDash['visits']['total'] ?? 0) >= 3);
+check('agent dashboard promises', isset($agentDash['promises']['pending']));
+
+// ---------------------------------------------------------------------------
+section('Notifications');
+
+$broadcastCount = Notification::broadcast('System maintenance', 'The system will be briefly unavailable tonight.', null, 1);
+check('broadcast reached active users', $broadcastCount >= 4, (string) $broadcastCount);
+$notifPage = Notification::paginateForUser($agent1Id, false, 1, 25);
+check('agent sees notifications', $notifPage->total >= 2);
+$firstNotif = $notifPage->items[0];
+check('mark read works', Notification::markRead((int) $firstNotif['id'], $agent1Id));
+check('markAllRead works', Notification::markAllRead($agent1Id) >= 0);
+check('unread count drops to 0', Notification::unreadCount($agent1Id) === 0);
+
+// ---------------------------------------------------------------------------
+section('Audit & activity logs');
+
+check('audit rows written', (int) $db->scalar('SELECT COUNT(*) FROM audit_logs') > 0);
+check('import audited', (int) $db->scalar("SELECT COUNT(*) FROM audit_logs WHERE action = 'import'") >= 2);
+check('visit creation audited', (int) $db->scalar("SELECT COUNT(*) FROM audit_logs WHERE entity_type = 'visit_report'") >= 4);
+check('assignment audited', (int) $db->scalar("SELECT COUNT(*) FROM audit_logs WHERE action IN ('assign','reassign')") >= 1);
+check('transfer audited', (int) $db->scalar("SELECT COUNT(*) FROM audit_logs WHERE action = 'transfer'") >= 1);
+check('activity rows written', (int) $db->scalar('SELECT COUNT(*) FROM activity_logs') > 0);
+check('failed logins logged', (int) $db->scalar("SELECT COUNT(*) FROM activity_logs WHERE activity = 'failed_login'") >= 2);
+check('audit JSON is valid', (function () use ($db): bool {
+    $row = $db->first("SELECT new_values FROM audit_logs WHERE new_values IS NOT NULL LIMIT 1");
+    return $row !== null && json_decode((string) $row['new_values'], true) !== null;
+})());
+
+\App\Core\Logger::audit('update', 'settings', null, ['smtp_password' => 'secret123'], ['smtp_password' => 'newsecret'], 'test redaction');
+check('secrets redacted in audit log', (function () use ($db): bool {
+    $row = $db->first("SELECT old_values, new_values FROM audit_logs WHERE entity_type = 'settings' ORDER BY id DESC LIMIT 1");
+    if ($row === null) {
+        return false;
+    }
+    $blob = (string) $row['old_values'] . (string) $row['new_values'];
+    return !str_contains($blob, 'secret123') && !str_contains($blob, 'newsecret') && str_contains($blob, '***');
+})());
+
+// ---------------------------------------------------------------------------
+section('Settings update');
+
+Settings::updateMany(['bank_name' => 'Test Gramin Bank', 'app_version' => '1.2.3'], 1);
+check('setting persisted', Settings::get('bank_name') === 'Test Gramin Bank');
+check('second setting persisted', Settings::get('app_version') === '1.2.3');
+check('missingRequired shrinks after fill', (function (): bool {
+    foreach (Settings::missingRequired() as $missing) {
+        if ($missing['key'] === 'bank_name') {
+            return false;
+        }
+    }
+    return true;
+})());
+
+// ---------------------------------------------------------------------------
+section('Database backup');
+
+// BackupService has two independent code paths - mysqldump when the binary is
+// present, a pure-PHP dump when it is not - and the two produce different SQL.
+// Testing only whichever one the host happens to take hid a failure for a while:
+// this suite passed locally (no mysqldump installed, PHP path) and failed in CI
+// (mysqldump installed) because the assertion below was written against the PHP
+// path's exact spelling, `FOREIGN_KEY_CHECKS = 0`, while mysqldump emits
+// `/*!40014 ... FOREIGN_KEY_CHECKS=0 */`. Both paths are now exercised on every
+// run, and the assertions check the invariant rather than one method's syntax.
+$mysqldumpPresent = false;
+if (function_exists('exec')) {
+    $probe = [];
+    $probeExit = 1;
+    @exec('command -v mysqldump 2>/dev/null', $probe, $probeExit);
+    $mysqldumpPresent = $probeExit === 0 && $probe !== [];
+}
+echo '  ....  mysqldump ' . ($mysqldumpPresent ? 'is' : 'is not') . " installed on this host\n";
+
+/**
+ * The assertions that must hold for a restorable dump, whichever path made it.
+ */
+$checkDump = static function (array $backup, string $label): string {
+    $sql = (string) file_get_contents($backup['path']);
+    check($label . ': created', is_file($backup['path']));
+    check($label . ': non-empty', $backup['size'] > 2000, 'size=' . $backup['size']);
+    check($label . ': has CREATE TABLE', str_contains($sql, 'CREATE TABLE'));
+    check($label . ': has INSERT for loan_accounts', str_contains($sql, 'INSERT INTO `loan_accounts`'));
+    // The invariant, not the spelling: a restore must not trip over a foreign
+    // key pointing at a table that does not exist yet.
+    check(
+        $label . ': disables FK checks',
+        preg_match('/FOREIGN_KEY_CHECKS\s*=\s*0/i', $sql) === 1
+    );
+    // A dump that begins with a stray warning line fails to restore.
+    check(
+        $label . ': starts with SQL or a comment, not a warning',
+        preg_match('/^\s*(--|\/\*|SET|CREATE|DROP|\/\*!)/i', $sql) === 1,
+        'first 60 chars: ' . substr(str_replace("\n", '\\n', $sql), 0, 60)
+    );
+    check($label . ': no mysqldump warning text leaked into the dump',
+        stripos($sql, 'mysqldump:') === false && stripos($sql, '[Warning]') === false);
+    return $sql;
+};
+
+// --- Path 1: whatever this host does by default -----------------------------
+$backup = BackupService::create();
+check(
+    'default backup method matches host capability',
+    $backup['method'] === ($mysqldumpPresent ? 'mysqldump' : 'php'),
+    'method=' . $backup['method']
+);
+$sql = $checkDump($backup, 'default backup (' . $backup['method'] . ')');
+
+// --- Path 2: force the pure-PHP dump ----------------------------------------
+// Simulates the common shared-hosting case where exec() works but mysqldump is
+// not installed, which is exactly the environment this project targets.
+Settings::updateMany(['mysqldump_path' => '/nonexistent/lrms-no-such-mysqldump']);
+Settings::flush();
+$phpBackup = BackupService::create();
+check('missing mysqldump falls back to the PHP dump', $phpBackup['method'] === 'php', 'method=' . $phpBackup['method']);
+$checkDump($phpBackup, 'PHP fallback');
+Settings::updateMany(['mysqldump_path' => 'mysqldump']);
+Settings::flush();
+
+check('backup listed', count(BackupService::list()) >= 2);
+check('path traversal rejected', BackupService::resolve('../../../etc/passwd') === null);
+check('non-sql rejected', BackupService::resolve('evil.php') === null);
+check('valid file resolves', BackupService::resolve($backup['file']) !== null);
+
+// ---------------------------------------------------------------------------
+section('KRM / OTS settlement report');
+
+// A settlement report is filed as a visit with report_type = 'ots' plus the
+// ots_details section. Sent with flat `ots_details[field]` keys, which is how the
+// app has to send it: the visit is multipart because it carries photos, and
+// multipart has no nesting.
+$otsLead = LoanAccount::find($leadId);
+$otsResult = VisitService::submit([
+    'loan_account_id' => $otsLead['id'],
+    'report_type'     => 'ots',
+    'customer_met'    => 1,
+    'ready_to_pay'    => 1,
+    'remarks'         => 'Borrower agreed to the OTS terms.',
+    'sp_cbc_name'     => 'S. Verma',
+    'ots_details[eligible_for_ots]'        => 1,
+    'ots_details[scheme]'                  => 'krm_ots',
+    'ots_details[relief_waiver_percent]'   => '77.5',
+    'ots_details[rlb_amount]'              => '200000',
+    'ots_details[borrower_payable_amount]' => '45000',
+    'ots_details[total_settlement_amount]' => '45000',
+    'ots_details[required_deposit_amount]' => '4500',
+    'ots_details[deposit_received]'        => 1,
+    'ots_details[deposit_amount]'          => '4500',
+    'ots_details[deposit_date]'            => date('Y-m-d'),
+    'ots_details[deposit_reference]'       => 'RCPT/2026/00191',
+    'ots_details[balance_payable]'         => '40500',
+    'ots_details[approval_status]'         => 'approved',
+    'ots_details[validity_from]'           => date('Y-m-d'),
+    'ots_details[validity_to]'             => date('Y-m-d', strtotime('+90 days')),
+    'ots_details[borrower_accepted]'       => 1,
+], $agentCtx);
+
+$otsVisitId = (int) $otsResult['visit_id'];
+check('OTS visit is created', $otsVisitId > 0);
+check('the visit is tagged report_type=ots',
+    ($db->scalar('SELECT report_type FROM visit_reports WHERE id = ?', [$otsVisitId])) === 'ots');
+
+$otsRow = VisitReport::otsDetails($otsVisitId);
+check('an ots_details row was written', $otsRow !== null);
+if ($otsRow !== null) {
+    check('scheme stored', $otsRow['scheme'] === 'krm_ots');
+    check('eligibility stored', (int) $otsRow['eligible_for_ots'] === 1);
+    check('relief percent stored', abs((float) $otsRow['relief_waiver_percent'] - 77.5) < 0.01);
+    // The figure the agent typed must survive untouched: the branch's sanction
+    // letter is the authority and a silent recalculation would misstate a
+    // settlement.
+    check('payable amount stored exactly as entered',
+        abs((float) $otsRow['borrower_payable_amount'] - 45000.0) < 0.01);
+    check('the scheme default payable percent is applied when not sent',
+        abs((float) $otsRow['payable_percent'] - 22.50) < 0.01);
+    check('the scheme default deposit percent is applied when not sent',
+        abs((float) $otsRow['initial_deposit_percent'] - 10.00) < 0.01);
+    // Deposit is EVIDENCE of a payment the borrower made to the bank; the agent
+    // never handles money.
+    check('deposit receipt reference stored', $otsRow['deposit_reference'] === 'RCPT/2026/00191');
+    check('deposit date stored', (string) $otsRow['deposit_date'] === date('Y-m-d'));
+    check('approval status stored', $otsRow['approval_status'] === 'approved');
+    check('borrower acceptance stored', (int) $otsRow['borrower_accepted'] === 1);
+    // Bank data, taken from the account: an agent cannot mistype the very date
+    // the settlement is being offered against.
+    check('the NPA date is snapshotted from the lead',
+        (string) ($otsRow['npa_date'] ?? '') === (string) ($otsLead['npa_date'] ?? ''),
+        'got ' . var_export($otsRow['npa_date'] ?? null, true));
+    check('the borrower name is snapshotted so the offer reads standalone',
+        (string) ($otsRow['borrower_name'] ?? '') === (string) $otsLead['customer_name']);
+    check('outstanding was snapshotted from the lead',
+        abs((float) $otsRow['outstanding_amount'] - (float) $otsLead['outstanding_amount']) < 0.01);
+}
+
+// RLB falls back to the outstanding balance, which is how the worked example runs:
+// payable is a percentage of the outstanding amount.
+$rlbDefault = VisitService::submit([
+    'loan_account_id' => $leadId,
+    'report_type'     => 'ots',
+    'customer_met'    => 1,
+    'ots_details[eligible_for_ots]' => 1,
+], $agentCtx);
+$rlbRow = VisitReport::otsDetails((int) $rlbDefault['visit_id']);
+check('RLB defaults to the outstanding balance when not supplied',
+    $rlbRow !== null
+    && abs((float) $rlbRow['rlb_amount'] - (float) $otsLead['outstanding_amount']) < 0.01,
+    'got ' . var_export($rlbRow['rlb_amount'] ?? null, true));
+
+// A percentage outside 0-100 is a typo, not data.
+$clampResult = VisitService::submit([
+    'loan_account_id' => $leadId,
+    'report_type'     => 'ots',
+    'customer_met'    => 1,
+    'ots_details[relief_waiver_percent]' => '250',
+    'ots_details[payable_percent]'       => '-5',
+], $agentCtx);
+$clamped = VisitReport::otsDetails((int) $clampResult['visit_id']);
+check('an out-of-range percent is clamped to 100', $clamped !== null
+    && abs((float) $clamped['relief_waiver_percent'] - 100.0) < 0.01);
+check('a negative percent is clamped to 0', $clamped !== null
+    && abs((float) $clamped['payable_percent'] - 0.0) < 0.01);
+
+// An unknown scheme must not be written through to the enum column.
+$badEnum = VisitService::submit([
+    'loan_account_id' => $leadId,
+    'report_type'     => 'ots',
+    'customer_met'    => 1,
+    'ots_details[scheme]'          => 'nonsense_scheme',
+    'ots_details[approval_status]' => 'nonsense_status',
+], $agentCtx);
+$badRow = VisitReport::otsDetails((int) $badEnum['visit_id']);
+check('an unknown scheme is stored as null, not written through', $badRow !== null && $badRow['scheme'] === null);
+check('an unknown approval status falls back to pending',
+    $badRow !== null && $badRow['approval_status'] === 'pending');
+
+// A plain recovery visit must not leave an empty settlement row behind.
+$plain = VisitService::submit([
+    'loan_account_id' => $leadId,
+    'customer_met'    => 1,
+    'not_ready'       => 1,
+], $agentCtx);
+check('a recovery visit defaults to report_type=recovery',
+    ($db->scalar('SELECT report_type FROM visit_reports WHERE id = ?', [(int) $plain['visit_id']])) === 'recovery');
+check('a recovery visit writes no ots_details row',
+    VisitReport::otsDetails((int) $plain['visit_id']) === null);
+check('a recovery visit writes no ckcc_details row',
+    VisitReport::ckccDetails((int) $plain['visit_id']) === null);
+
+// ---------------------------------------------------------------------------
+section('CKCC OD-2 renewal report');
+
+$ckccLeadId = (int) $ln1002['id'];
+$db->query(
+    'UPDATE loan_accounts
+        SET cif_number = ?, sanction_date = ?, sanction_limit = ?, drawing_power = ?,
+            interest_overdue = ?, ckcc_renewal_due_date = ?, loan_type = ?
+      WHERE id = ?',
+    ['CIF900123', '2023-06-15', 300000, 285000, 12500, date('Y-m-d', strtotime('+10 days')), 'CKCC', $ckccLeadId]
+);
+$ckccLead = LoanAccount::find($ckccLeadId);
+check('CKCC attributes are readable from the lead', (string) $ckccLead['cif_number'] === 'CIF900123');
+
+$ckccResult = VisitService::submit([
+    'loan_account_id' => $ckccLeadId,
+    'report_type'     => 'ckcc_renewal',
+    'customer_met'    => 1,
+    'borrower_alive'  => 1,
+    'same_address'    => 1,
+    'occupation'      => 'agriculture',
+    'remarks'         => 'Renewal papers collected.',
+    'ckcc_details[eligible_for_renewal]'   => 1,
+    'ckcc_details[kyc_status]'             => 'complete',
+    'ckcc_details[aadhaar_seeded]'         => 1,
+    'ckcc_details[mobile_linked]'          => 1,
+    'ckcc_details[aadhaar_auth_completed]' => 1,
+    // Section 7 of the printed form, and a TOP-LEVEL field now rather than part of
+    // the renewal section: the checklist is asked on every case type, and keeping a
+    // second copy on the renewal row let one report answer it twice.
+    'doc_aadhaar'                          => 1,
+    'doc_passbook'                         => 1,
+    'doc_khatauni'                         => 1,
+    'ckcc_details[willing_to_renew]'       => 1,
+    'ckcc_details[renewal_form_signed]'    => 1,
+    'ckcc_details[ekyc_completed]'         => 1,
+    'ckcc_details[agent_observation]'      => 'Borrower cooperative, land records in order.',
+    'ckcc_details[rec_renew_immediately]'  => 1,
+    'ckcc_details[st_documents_collected]' => 1,
+], $agentCtx);
+
+$ckccVisitId = (int) $ckccResult['visit_id'];
+check('CKCC visit is created', $ckccVisitId > 0);
+check('the visit is tagged report_type=ckcc_renewal',
+    ($db->scalar('SELECT report_type FROM visit_reports WHERE id = ?', [$ckccVisitId])) === 'ckcc_renewal');
+
+$ckccRow = VisitReport::ckccDetails($ckccVisitId);
+check('a ckcc_details row was written', $ckccRow !== null);
+if ($ckccRow !== null) {
+    // Account figures are pre-filled from the lead so the agent does not copy
+    // them off a passbook by hand.
+    check('CIF was pulled from the lead', (string) $ckccRow['cif_number'] === 'CIF900123');
+    check('sanction limit was pulled from the lead',
+        abs((float) $ckccRow['sanction_limit'] - 300000.0) < 0.01);
+    check('drawing power was pulled from the lead',
+        abs((float) $ckccRow['drawing_power'] - 285000.0) < 0.01);
+    check('renewal due date was pulled from the lead',
+        (string) $ckccRow['renewal_due_date'] === date('Y-m-d', strtotime('+10 days')));
+
+    // Derived server-side, never trusted from the device: a phone with a wrong
+    // clock would otherwise write a misleading deadline into a report a branch
+    // acts on.
+    check('days remaining is computed', (int) $ckccRow['days_remaining'] === 10,
+        'got ' . var_export($ckccRow['days_remaining'], true));
+    check('expected NPA date is the day after the renewal deadline',
+        (string) $ckccRow['expected_npa_date'] === date('Y-m-d', strtotime('+11 days')));
+    check('the due bucket is derived as within_15 for 10 days out',
+        $ckccRow['renewal_due_bucket'] === 'within_15',
+        'got ' . var_export($ckccRow['renewal_due_bucket'], true));
+
+    check('KYC status stored', $ckccRow['kyc_status'] === 'complete');
+    check('the renewal row no longer carries its own document checklist',
+        !array_key_exists('doc_aadhaar', $ckccRow) && !array_key_exists('doc_khasra_khatauni', $ckccRow));
+
+    $ckccParent = VisitReport::find($ckccVisitId);
+    check('document availability flags stored on the report itself',
+        (int) $ckccParent['doc_aadhaar'] === 1
+        && (int) $ckccParent['doc_khatauni'] === 1
+        && (int) $ckccParent['doc_pan'] === 0);
+    check('consent flags stored',
+        (int) $ckccRow['willing_to_renew'] === 1 && (int) $ckccRow['renewal_form_signed'] === 1);
+    check('agent observation stored',
+        str_contains((string) $ckccRow['agent_observation'], 'land records in order'));
+    check('recommendation flag stored', (int) $ckccRow['rec_renew_immediately'] === 1);
+    check('report status flag stored', (int) $ckccRow['st_documents_collected'] === 1);
+
+    // No location data is captured anywhere in this system.
+    check('the CKCC section carries no location columns',
+        !array_key_exists('latitude', $ckccRow)
+        && !array_key_exists('longitude', $ckccRow)
+        && !array_key_exists('gps', $ckccRow));
+}
+
+// An overdue renewal must bucket as overdue and report negative days.
+$db->query('UPDATE loan_accounts SET ckcc_renewal_due_date = ? WHERE id = ?',
+    [date('Y-m-d', strtotime('-4 days')), (int) $ln1003['id']]);
+$overdueResult = VisitService::submit([
+    'loan_account_id' => (int) $ln1003['id'],
+    'report_type'     => 'ckcc_renewal',
+    'customer_met'    => 1,
+    'ckcc_details[eligible_for_renewal]' => 1,
+], $agentCtx);
+$overdueRow = VisitReport::ckccDetails((int) $overdueResult['visit_id']);
+check('an overdue renewal reports negative days remaining',
+    $overdueRow !== null && (int) $overdueRow['days_remaining'] === -4,
+    'got ' . var_export($overdueRow['days_remaining'] ?? null, true));
+check('an overdue renewal buckets as overdue',
+    $overdueRow !== null && $overdueRow['renewal_due_bucket'] === 'overdue');
+
+// Both sections are append-only, exactly like their parent report.
+check('visit_ots_details has no UPDATE path in the codebase',
+    !str_contains((string) file_get_contents(ROOT_PATH . '/app/Services/VisitService.php'),
+        "update('visit_ots_details'"));
+check('visit_ckcc_details has no UPDATE path in the codebase',
+    !str_contains((string) file_get_contents(ROOT_PATH . '/app/Services/VisitService.php'),
+        "update('visit_ckcc_details'"));
+
+// Deleting a visit report must take its detail rows with it.
+$db->query('DELETE FROM visit_reports WHERE id = ?', [(int) $badEnum['visit_id']]);
+check('deleting a visit cascades to its ots_details row',
+    VisitReport::otsDetails((int) $badEnum['visit_id']) === null);
+// That DELETE went behind the service's back, so the lead's derived visit_count
+// is now stale - the referential-integrity section below checks it, and caught
+// this the first time round. Rebuild it rather than leaving the fixture wrong.
+LoanAccount::refreshVisitCounters($leadId);
+
+// ---------------------------------------------------------------------------
+section('The printed form, section by section');
+// ---------------------------------------------------------------------------
+// Everything the D2 Recovery Solutions & Services "Field Visit Verification Report" asks for that this
+// system had nowhere to put. Each check below corresponds to a box or a line on the
+// paper form, and the reason they are worth asserting is that a field which silently
+// stops being saved looks exactly like a field an agent left blank.
+
+// The branch master carries the hierarchy, so it can be stamped onto the report
+// instead of being retyped at every doorstep.
+$db->query(
+    'UPDATE branches SET regional_office = ?, zone = ?, district = ? WHERE id = ?',
+    ['Ajmer Regional Office', 'North Zone', 'Bhilwara', $branchAId]
+);
+
+$formResult = VisitService::submit([
+    'loan_account_id' => $leadId,
+    'visit_date'      => date('Y-m-d'),
+    'visit_time'      => '11:15',
+    'report_type'     => 'pre_npa',
+    'customer_met'    => '1',
+
+    // 2. Borrower information
+    'gender'          => 'female',
+    'date_of_birth'   => '12/07/1979',
+    'pan_number'      => ' abcde1234f ',
+    'addr_village'    => 'Kotri',
+    'gram_panchayat'  => 'Kotri Gram Panchayat',
+    'tehsil'          => 'Mandal',
+    'addr_district'   => 'Bhilwara',
+    'state'           => 'Rajasthan',
+    'pin_code'        => '311001',
+
+    // 3. Loan account details
+    'cif_number'           => 'CIF554433',
+    'loan_type'            => 'ckcc',
+    'sanction_date'        => '2023-04-01',
+    'sanction_limit'       => '2,50,000',
+    'drawing_power'        => '2,25,000',
+    'interest_overdue'     => '4500.50',
+    'asset_classification' => 'SMA-2',
+
+    // 6. Physical verification
+    'occupation'             => 'service',
+    'residence_verified'     => 'confirmed',
+    'neighbour_verification' => 'conducted',
+
+    // 7. Documents verified
+    'doc_aadhaar'          => '1',
+    'doc_electricity_bill' => '1',
+    'doc_ots_consent_letter' => '1',
+    'doc_others'           => '1',
+    'doc_other_text'       => 'Ration card',
+
+    // 9. Recommendation
+    'general_recommendation' => 'Renew before the deadline and keep a monthly follow-up.',
+
+    // 10. Evidence attached
+    'ev_borrower_photo' => '1',
+    'ev_gps_location'   => '1',
+    'ev_others'         => '1',
+    'ev_other_text'     => 'Panchayat letter',
+
+    // 11 + 12
+    'declaration_accepted'    => '1',
+    'supervisor_name'         => 'S. Verma',
+    'supervisor_designation'  => 'Branch Manager',
+    'supervisor_employee_id'  => 'EMP-4477',
+    'supervisor_verified_at'  => date('Y-m-d'),
+], $agentCtx);
+
+$form = VisitReport::findWithPii((int) $formResult['visit_id']);
+check('a report can be filed as a Pre-NPA verification', (string) $form['report_type'] === 'pre_npa');
+
+// Section 1 - stamped from the branch master, not asked of the agent.
+check('the branch code is stamped from the branch master',
+    (string) $form['branch_code'] === 'BR001', (string) $form['branch_code']);
+check('the regional office is stamped from the branch master',
+    (string) $form['regional_office'] === 'Ajmer Regional Office');
+check('the zone is stamped from the branch master', (string) $form['zone'] === 'North Zone');
+check('the district is stamped from the branch master', (string) $form['district'] === 'Bhilwara');
+check('the linked branch is the branch the agent is attached to',
+    (string) $form['linked_branch'] === 'Bhilwara Main', (string) $form['linked_branch']);
+
+// Section 2.
+check('gender is stored', (string) $form['gender'] === 'female');
+check('a day-first date of birth is parsed', (string) $form['date_of_birth'] === '1979-07-12',
+    (string) $form['date_of_birth']);
+check('the PAN is not stored in plaintext',
+    $db->scalar('SELECT pan_enc FROM visit_reports WHERE id = ?', [(int) $form['id']]) !== 'ABCDE1234F');
+check('the PAN decrypts, normalised to upper case', (string) $form['pan'] === 'ABCDE1234F',
+    var_export($form['pan'], true));
+check('the PAN is masked to its last four characters',
+    (string) $form['pan_masked'] === 'XXXXXX234F', (string) $form['pan_masked']);
+// The bug this guards against: searchHash() strips everything that is not a digit, so
+// every PAN would collapse to its four-digit block and two unrelated borrowers would
+// share a hash. It would only ever surface as a lookup returning the wrong person.
+check('two PANs sharing a digit block hash differently',
+    Crypto::panHash('ABCDE1234F') !== Crypto::panHash('ZZZZZ1234Q'));
+check('a PAN hashes the same however it is typed',
+    Crypto::panHash('abcde 1234 f') === Crypto::panHash('ABCDE1234F'));
+check('the address is broken up as the form asks',
+    (string) $form['gram_panchayat'] === 'Kotri Gram Panchayat'
+    && (string) $form['tehsil'] === 'Mandal'
+    && (string) $form['addr_district'] === 'Bhilwara'
+    && (string) $form['state'] === 'Rajasthan'
+    && (string) $form['pin_code'] === '311001');
+// The second number comes off the borrower record rather than being retyped, and is
+// snapshotted so the report shows the number that was current on the day.
+check('the alternate mobile is snapshotted onto the report',
+    array_key_exists('alt_mobile_masked', $form));
+
+// Section 3.
+check('the CIF number is on the report itself', (string) $form['cif_number'] === 'CIF554433');
+check('a grouped sanction limit is parsed', abs((float) $form['sanction_limit'] - 250000.0) < 0.01);
+check('drawing power is parsed', abs((float) $form['drawing_power'] - 225000.0) < 0.01);
+check('interest overdue is parsed', abs((float) $form['interest_overdue'] - 4500.50) < 0.01);
+check('the sanction date is stored', (string) $form['sanction_date'] === '2023-04-01');
+// loan_accounts.asset_classification is free text because the bank's export writes it;
+// the form is five boxes, so "SMA-2" has to land in one of them.
+check('a free-text asset classification maps onto the form\'s box',
+    (string) $form['asset_classification'] === 'sma_2', (string) $form['asset_classification']);
+
+// Section 6.
+check('residence verification is stored', (string) $form['residence_verified'] === 'confirmed');
+check('neighbour verification is stored', (string) $form['neighbour_verification'] === 'conducted');
+check('the occupation enum accepts Service', (string) $form['occupation'] === 'service');
+
+// Section 7 - on the report, for every case type, not just a renewal.
+check('the documents-verified checklist is stored on the report',
+    (int) $form['doc_aadhaar'] === 1
+    && (int) $form['doc_electricity_bill'] === 1
+    && (int) $form['doc_ots_consent_letter'] === 1
+    && (int) $form['doc_passbook'] === 0);
+check('the other-document note is stored', (string) $form['doc_other_text'] === 'Ration card');
+
+// Sections 9, 10, 11, 12.
+check('the general recommendation is stored',
+    str_contains((string) $form['general_recommendation'], 'monthly follow-up'));
+check('the evidence checklist is stored',
+    (int) $form['ev_borrower_photo'] === 1
+    && (int) $form['ev_gps_location'] === 1
+    && (int) $form['ev_passbook_copy'] === 0);
+check('the other-evidence note is stored', (string) $form['ev_other_text'] === 'Panchayat letter');
+check('the declaration acceptance is recorded', (int) $form['declaration_accepted'] === 1);
+// Their own staff number, off their user record: it is printed so a branch can ring
+// back whoever filed the report, and asking for it again at every door would only be
+// a chance to mistype it.
+check('the agent mobile defaults to the number on their user record',
+    (string) $form['agent_mobile'] === '9822222222', var_export($form['agent_mobile'], true));
+check('the supervisor block is stored',
+    (string) $form['supervisor_designation'] === 'Branch Manager'
+    && (string) $form['supervisor_employee_id'] === 'EMP-4477');
+
+// An APK built before the form's wording changed still sends 'job'. Translated rather
+// than dropped: the two words mean the same thing here, and storing NULL would lose an
+// occupation somebody recorded at a door.
+$legacy = VisitService::submit([
+    'loan_account_id' => $leadId,
+    'visit_time'      => '12:00',
+    'customer_met'    => '1',
+    'occupation'      => 'job',
+], $agentCtx);
+check("an older app's 'job' occupation becomes 'service'",
+    (string) VisitReport::find((int) $legacy['visit_id'])['occupation'] === 'service');
+
+// A classification the form has no box for must stay NULL rather than be forced into
+// the nearest one: a report claiming "Standard" because nothing matched would be worse
+// than one that leaves the row blank.
+$unknownClass = VisitService::submit([
+    'loan_account_id' => $leadId,
+    'visit_time'      => '12:05',
+    'customer_met'    => '1',
+    'asset_classification' => 'Doubtful 2',
+], $agentCtx);
+check('an asset classification outside the form stays NULL',
+    VisitReport::find((int) $unknownClass['visit_id'])['asset_classification'] === null);
+
+// A Case Type this system does not know must not be stored as though it were real.
+$badType = VisitService::submit([
+    'loan_account_id' => $leadId,
+    'visit_time'      => '12:10',
+    'customer_met'    => '1',
+    'report_type'     => 'whatever',
+], $agentCtx);
+check('an unknown case type falls back to a recovery follow-up',
+    (string) VisitReport::find((int) $badType['visit_id'])['report_type'] === 'recovery');
+
+// ---- Section 4 and 13, the settlement halves -----------------------------
+$otsForm = VisitService::submit([
+    'loan_account_id' => $leadId,
+    'visit_time'      => '12:20',
+    'report_type'     => 'ots',
+    'customer_met'    => '1',
+    'ots_details[eligible_for_ots]'  => '1',
+    'ots_details[scheme]'            => 'other',
+    'ots_details[scheme_other_text]' => 'State relief package 2024',
+    // Why the borrower said no, which the accepted/not-accepted boolean cannot carry.
+    'ots_details[customer_response]' => 'requested_time',
+    'ots_details[expected_deposit_date]' => date('Y-m-d', strtotime('+21 days')),
+    'ots_details[rec_proposal_recommended]' => '1',
+    'ots_details[rec_followup_required]'    => '1',
+    'ots_details[st_customer_contacted]'    => '1',
+    'ots_details[st_initial_deposit_received]' => '1',
+], $agentCtx);
+$otsFormRow = VisitReport::otsDetails((int) $otsForm['visit_id']);
+check('a settlement can record a scheme outside the two named ones',
+    $otsFormRow !== null && (string) $otsFormRow['scheme'] === 'other'
+    && (string) $otsFormRow['scheme_other_text'] === 'State relief package 2024');
+check('the customer response is stored alongside the boolean',
+    $otsFormRow !== null && (string) $otsFormRow['customer_response'] === 'requested_time'
+    && (int) $otsFormRow['borrower_accepted'] === 0);
+check('a promised deposit date is kept apart from the actual one',
+    $otsFormRow !== null
+    && (string) $otsFormRow['expected_deposit_date'] === date('Y-m-d', strtotime('+21 days'))
+    && $otsFormRow['deposit_date'] === null);
+check('the settlement recommendation flags are stored',
+    $otsFormRow !== null && (int) $otsFormRow['rec_proposal_recommended'] === 1
+    && (int) $otsFormRow['rec_followup_required'] === 1
+    && (int) $otsFormRow['rec_not_eligible'] === 0);
+check('the settlement status flags are stored',
+    $otsFormRow !== null && (int) $otsFormRow['st_customer_contacted'] === 1
+    && (int) $otsFormRow['st_initial_deposit_received'] === 1
+    && (int) $otsFormRow['st_ots_closed'] === 0);
+check('an invalid customer response is stored as NULL, not guessed',
+    VisitReport::otsDetails((int) VisitService::submit([
+        'loan_account_id' => $leadId,
+        'visit_time'      => '12:25',
+        'report_type'     => 'ots',
+        'customer_met'    => '1',
+        'ots_details[customer_response]' => 'maybe',
+    ], $agentCtx)['visit_id'])['customer_response'] === null);
+
+// ---- Section 9's missing renewal box -------------------------------------
+$pendingDocs = VisitService::submit([
+    'loan_account_id' => $leadId,
+    'visit_time'      => '12:30',
+    'report_type'     => 'ckcc_renewal',
+    'customer_met'    => '1',
+    'ckcc_details[renewal_due_date]'       => date('Y-m-d', strtotime('+20 days')),
+    'ckcc_details[rec_pending_documents]'  => '1',
+], $agentCtx);
+// "Documents complete" unticked could not say whether anything was outstanding.
+check('a renewal can record that documents are still pending',
+    (int) VisitReport::ckccDetails((int) $pendingDocs['visit_id'])['rec_pending_documents'] === 1);
+
+// ---- The option lists the app renders ------------------------------------
+// The app builds its dropdowns and tick lists from these, so a label that drifts
+// changes what an agent is asked without anybody editing a form.
+check('every case type on the form has an option',
+    count(VisitReport::REPORT_TYPES) === 6 && isset(VisitReport::REPORT_TYPES['pre_npa']));
+check('the documents checklist has all eleven boxes',
+    count(VisitReport::DOCUMENT_FLAGS) === 11);
+check('the evidence checklist has all nine boxes',
+    count(VisitReport::EVIDENCE_FLAGS) === 9);
+check('the declaration is three clauses', count(VisitReport::DECLARATION) === 3);
+check('the declaration names the RBI and the Fair Practices Code',
+    str_contains(implode(' ', VisitReport::DECLARATION), 'Reserve Bank of India')
+    && str_contains(implode(' ', VisitReport::DECLARATION), 'Fair Practices Code'));
+// Every flag map has to name a real column, or the screen prints a permanently
+// unticked box and the PDF prints it too.
+foreach ([
+    'DOCUMENT_FLAGS' => VisitReport::DOCUMENT_FLAGS,
+    'EVIDENCE_FLAGS' => VisitReport::EVIDENCE_FLAGS,
+    'CONTACT_FLAGS'  => VisitReport::CONTACT_FLAGS,
+    'RECOVERY_FLAGS' => VisitReport::RECOVERY_FLAGS,
+    'REASON_FLAGS'   => VisitReport::REASON_FLAGS,
+    'RECOMMENDATION_FLAGS' => VisitReport::RECOMMENDATION_FLAGS,
+] as $mapName => $map) {
+    $missing = array_diff(array_keys($map), array_keys($form));
+    check("every column in {$mapName} exists on visit_reports", $missing === [], implode(', ', $missing));
+}
+foreach ([
+    'OTS_RECOMMENDATION_FLAGS' => VisitReport::OTS_RECOMMENDATION_FLAGS,
+    'OTS_STATUS_FLAGS'         => VisitReport::OTS_STATUS_FLAGS,
+] as $mapName => $map) {
+    $missing = array_diff(array_keys($map), array_keys((array) $otsFormRow));
+    check("every column in {$mapName} exists on visit_ots_details", $missing === [], implode(', ', $missing));
+}
+$ckccColumns = (array) VisitReport::ckccDetails((int) $pendingDocs['visit_id']);
+foreach ([
+    'CKCC_ELIGIBILITY_FLAGS'    => VisitReport::CKCC_ELIGIBILITY_FLAGS,
+    'CKCC_CONSENT_FLAGS'        => VisitReport::CKCC_CONSENT_FLAGS,
+    'CKCC_RECOMMENDATION_FLAGS' => VisitReport::CKCC_RECOMMENDATION_FLAGS,
+    'CKCC_STATUS_FLAGS'         => VisitReport::CKCC_STATUS_FLAGS,
+] as $mapName => $map) {
+    $missing = array_diff(array_keys($map), array_keys($ckccColumns));
+    check("every column in {$mapName} exists on visit_ckcc_details", $missing === [], implode(', ', $missing));
+}
+// And the correctable list, which a reviewer's form is built from: a name in it that
+// is not a column would silently drop the correction.
+$notColumns = array_diff(array_keys(VisitReport::CORRECTABLE), array_keys($form));
+check('every correctable field is a real column on visit_reports', $notColumns === [], implode(', ', $notColumns));
+
+LoanAccount::refreshVisitCounters($leadId);
+// ---------------------------------------------------------------------------
+section('Email login and email OTP');
+
+$emailUser = User::find($agent1Id);
+$emailAddress = (string) ($emailUser['email'] ?? '');
+check('the seeded agent has an email address', $emailAddress !== '');
+
+if ($emailAddress !== '') {
+    // Office staff know their email address, not their employee code.
+    $byEmail = Auth::attempt($emailAddress, 'Agent@123', '127.0.0.1');
+    check('an agent can sign in with their email address',
+        ($byEmail['user']['id'] ?? 0) === $agent1Id,
+        (string) ($byEmail['error'] ?? ''));
+
+    // Case must not matter - a phone keyboard capitalises the first letter.
+    $mixedCase = Auth::attempt(strtoupper($emailAddress), 'Agent@123', '127.0.0.1');
+    check('email sign-in is case-insensitive', ($mixedCase['user']['id'] ?? 0) === $agent1Id);
+
+    $stillCode = Auth::attempt((string) $emailUser['employee_code'], 'Agent@123', '127.0.0.1');
+    check('the employee code still works', ($stillCode['user']['id'] ?? 0) === $agent1Id);
+
+    $wrong = Auth::attempt($emailAddress, 'not-the-password', '127.0.0.1');
+    check('a wrong password is still refused for an email sign-in', $wrong['user'] === null);
+    check('the error names both accepted identifiers',
+        str_contains((string) $wrong['error'], 'employee code or email'),
+        (string) $wrong['error']);
+}
+
+check('an unknown email is refused', Auth::attempt('nobody@example.com', 'x', '127.0.0.1')['user'] === null);
+
+// Email is a login identifier, so the schema must stop two accounts sharing one.
+$dupBlocked = false;
+try {
+    $db->query('UPDATE users SET email = ? WHERE id = ?', [$emailAddress, $agent2Id]);
+} catch (\Throwable $e) {
+    $dupBlocked = true;
+}
+check('the database refuses two accounts with the same email', $dupBlocked,
+    'a duplicate address was accepted - email sign-in could resolve to the wrong person');
+
+// ---- OTP delivery ----------------------------------------------------------
+$db->query('DELETE FROM password_otps');
+Settings::updateMany(['smtp_host' => '', 'smtp_from_email' => '']);
+Settings::flush();
+
+$noChannel = Auth::issuePasswordOtp($emailUser, '127.0.0.1');
+check('with no SMTP and no SMS gateway the reset falls back to an admin reset',
+    $noChannel['channel'] === 'admin' && $noChannel['sent'] === false);
+check('and no OTP row is written when nothing can deliver it',
+    (int) $db->scalar('SELECT COUNT(*) FROM password_otps') === 0);
+
+// Configure SMTP. Delivery itself will fail (no mail server here), but the row
+// and the chosen channel are what matter.
+Settings::updateMany(['smtp_host' => 'localhost', 'smtp_from_email' => 'noreply@example.com']);
+Settings::flush();
+
+$viaEmail = Auth::issuePasswordOtp($emailUser, '127.0.0.1');
+check('email is chosen over SMS when SMTP is configured', $viaEmail['channel'] === 'email');
+check('the OTP row records the email channel',
+    $db->scalar('SELECT channel FROM password_otps WHERE user_id = ? ORDER BY id DESC LIMIT 1', [$agent1Id]) === 'email');
+check('the destination shown to the user is masked',
+    $viaEmail['destination'] !== null
+    && str_contains((string) $viaEmail['destination'], '*')
+    && $viaEmail['destination'] !== $emailAddress,
+    (string) $viaEmail['destination']);
+check('the masked address keeps its domain so the user can recognise it',
+    str_contains((string) $viaEmail['destination'], substr($emailAddress, strrpos($emailAddress, '@'))));
+
+// The OTP itself must never be stored in the clear.
+$stored = (string) $db->scalar('SELECT otp_hash FROM password_otps WHERE user_id = ? ORDER BY id DESC LIMIT 1', [$agent1Id]);
+check('only a SHA-256 hash of the code is stored', strlen($stored) === 64 && ctype_xdigit($stored));
+
+// Requesting a second code must retire the first, or an old one stays valid.
+$before = (int) $db->scalar('SELECT id FROM password_otps WHERE user_id = ? ORDER BY id DESC LIMIT 1', [$agent1Id]);
+Auth::issuePasswordOtp($emailUser, '127.0.0.1');
+check('requesting a new code invalidates the previous one',
+    $db->scalar('SELECT used_at FROM password_otps WHERE id = ?', [$before]) !== null);
+check('exactly one unused code remains',
+    (int) $db->scalar('SELECT COUNT(*) FROM password_otps WHERE user_id = ? AND used_at IS NULL', [$agent1Id]) === 1);
+
+check('masked local parts are short but not empty', Auth::maskEmail('a@b.com') === 'a**@b.com',
+    Auth::maskEmail('a@b.com'));
+check('a malformed address masks to nothing useful', Auth::maskEmail('not-an-email') === '****');
+
+// ---------------------------------------------------------------------------
+section('Referential integrity');
+
+check('every loan_account has a customer',
+    (int) $db->scalar('SELECT COUNT(*) FROM loan_accounts la LEFT JOIN customers c ON c.id = la.customer_id WHERE c.id IS NULL') === 0);
+check('every visit_report has a loan_account',
+    (int) $db->scalar('SELECT COUNT(*) FROM visit_reports vr LEFT JOIN loan_accounts la ON la.id = vr.loan_account_id WHERE la.id IS NULL') === 0);
+check('every promise links to a visit',
+    (int) $db->scalar('SELECT COUNT(*) FROM promises WHERE visit_report_id IS NULL') === 0);
+check('timeline references resolve',
+    (int) $db->scalar('SELECT COUNT(*) FROM visit_history vh LEFT JOIN loan_accounts la ON la.id = vh.loan_account_id WHERE la.id IS NULL') === 0);
+check('visit_count matches visit_reports', (int) $db->scalar(
+    'SELECT COUNT(*) FROM loan_accounts la
+      WHERE la.visit_count <> (SELECT COUNT(*) FROM visit_reports vr WHERE vr.loan_account_id = la.id)'
+) === 0);
+
+// User deletion guard
+$guard = User::deletable($agent1Id);
+check('agent with leads cannot be deleted', $guard['ok'] === false);
+check('guard explains why', str_contains($guard['reason'], 'lead'));
+$branchGuard = Branch::deletable($branchAId);
+check('branch with leads cannot be deleted', $branchGuard['ok'] === false);
+
+// ---------------------------------------------------------------------------
+section('Geocoding: coordinates are the record, the address is derived');
+
+// The grid key is what collapses a day of standing outside one house into a single
+// lookup. If its rounding changes, every cached address is orphaned at once.
+$keyA = \App\Services\GeocodingService::keyFor(19.07283499, 72.88261099);
+$keyB = \App\Services\GeocodingService::keyFor(19.07284100, 72.88261900);
+check('nearby coordinates share one cache key', $keyA === $keyB, $keyA . ' vs ' . $keyB);
+check('the key is rounded to 4dp', $keyA === '19.0728,72.8826', $keyA);
+
+$keyFar = \App\Services\GeocodingService::keyFor(19.0800, 72.8826);
+check('coordinates 800m apart do not share a key', $keyA !== $keyFar);
+
+// (0,0) is a real place in the Gulf of Guinea and what a phone reports with no fix.
+check('null island is never cached', \App\Services\GeocodingService::cached(0.0, 0.0) === null);
+check('null island has no display form', \App\Services\GeocodingService::formatCoordinates(0.0, 0.0) === null);
+check('a real coordinate formats for display',
+    \App\Services\GeocodingService::formatCoordinates(19.0728, 72.8826) === '19.072800, 72.882600');
+
+// Reading must never call out. A view that could trigger a network request turns one
+// slow third party into a slow panel, and fifty rows into fifty sequential calls.
+$db->query(
+    "INSERT INTO geocode_cache (grid_key, latitude, longitude, address, village, provider)
+     VALUES (?, ?, ?, ?, ?, 'nominatim')",
+    [$keyA, 19.0728, 72.8826, 'Test Nagar, Mumbai Suburban, Maharashtra', 'Test Nagar']
+);
+check('a cached address is read back', \App\Services\GeocodingService::cached(19.0728, 72.8826)
+    === 'Test Nagar, Mumbai Suburban, Maharashtra');
+check('a cache miss returns null rather than blocking',
+    \App\Services\GeocodingService::cached(28.6139, 77.2090) === null);
+
+$many = \App\Services\GeocodingService::cachedMany([[19.0728, 72.8826], [28.6139, 77.2090], [0.0, 0.0]]);
+check('cachedMany resolves in one query and skips the unknown', count($many) === 1);
+check('cachedMany keys by grid key', array_key_exists($keyA, $many));
+
+// A failed lookup must be remembered, or every page view retries it forever - which
+// is exactly what gets a shared host's IP blocked by a free service.
+$db->query(
+    "INSERT INTO geocode_cache (grid_key, latitude, longitude, address, failed_at, attempts)
+     VALUES ('11.1111,11.1111', 11.1111, 11.1111, NULL, NOW(), 3)"
+);
+check('a failure is stored without an address', (int) $db->scalar(
+    "SELECT COUNT(*) FROM geocode_cache WHERE grid_key = '11.1111,11.1111' AND address IS NULL AND failed_at IS NOT NULL"
+) === 1);
+check('a failed coordinate reads as unresolved',
+    \App\Services\GeocodingService::cached(11.1111, 11.1111) === null);
+
+// Lookups stay off until somebody says who is calling. Sending anonymous traffic to
+// a free service borrows goodwill against everyone else on the same IP.
+Settings::updateMany(['geocode_enabled' => '1', 'geocode_contact_email' => ''], null);
+check('lookups are off without a contact address', \App\Services\GeocodingService::enabled() === false);
+check('and it says why', str_contains(
+    (string) \App\Services\GeocodingService::disabledReason(), 'geocode_contact_email'
+));
+Settings::updateMany(['geocode_contact_email' => 'ops@example.test'], null);
+check('lookups are on once a contact address is set', \App\Services\GeocodingService::enabled() === true);
+Settings::updateMany(['geocode_enabled' => '0'], null);
+check('the operator can turn lookups off entirely', \App\Services\GeocodingService::enabled() === false);
+check('turning them off is reported as a choice, not a fault', str_contains(
+    (string) \App\Services\GeocodingService::disabledReason(), 'geocode_enabled'
+));
+$backfill = \App\Services\GeocodingService::backfill(5);
+check('backfill does nothing while disabled', $backfill['queued'] === 0 && $backfill['skipped'] !== null);
+Settings::updateMany(['geocode_enabled' => '1'], null);
+
+// ---------------------------------------------------------------------------
+section('BC targets and SSS enrolment');
+
+// A month that is not a month must not silently become this month, or targets get
+// written against a period nobody chose and the warning cron measures against them.
+check('YYYY-MM parses', \App\Models\BcTarget::parseMonth('2026-08') === '2026-08-01');
+check('YYYY-MM-DD parses to the 1st', \App\Models\BcTarget::parseMonth('2026-08-17') === '2026-08-01');
+check('month 13 is refused', \App\Models\BcTarget::parseMonth('2026-13') === null);
+check('month 00 is refused', \App\Models\BcTarget::parseMonth('2026-00') === null);
+check('a word is refused', \App\Models\BcTarget::parseMonth('August') === null);
+check('an empty string is refused', \App\Models\BcTarget::parseMonth('') === null);
+
+$targetId = \App\Models\BcTarget::create([
+    'agent_id' => $agent1Id,
+    'target_month' => '2026-11-01',
+    'daily_visit_target' => 8,
+    'apy_target' => 20,
+    'npa_recovery_target' => 50000.00,
+    'set_by' => null,
+]);
+check('a target row is created', $targetId > 0);
+check('it is found by the 1st of the month, which is how the service looks it up',
+    \App\Models\BcTarget::findForMonth($agent1Id, '2026-11-19') !== null);
+check('BcPerformanceService finds the same row',
+    \App\Services\BcPerformanceService::targetsFor($agent1Id, '2026-11-19') !== null);
+
+// Deleting a target that warnings were measured against would leave an agent holding
+// a warning nobody can justify or dispute.
+$db->query(
+    "INSERT INTO bc_warnings (agent_id, warning_level, target_type, target_value, achieved_value,
+                              gap_value, miss_streak, triggered_date)
+     VALUES (?, 'L1', 'visit', '8', '2', '6', 1, '2026-11-12')",
+    [$agent1Id]
+);
+$targetGuard = \App\Models\BcTarget::deletable($targetId);
+check('an assessed month cannot be deleted', $targetGuard['ok'] === false);
+check('the refusal explains why', str_contains($targetGuard['reason'], 'warning'));
+
+$sssId = \App\Models\SssEnrollment::create([
+    'agent_id' => $agent1Id,
+    'branch_id' => $branchAId,
+    'enrollment_date' => '2026-11-12',
+    'apy_count' => 2,
+    'pmjjby_count' => 3,
+    'pmsby_count' => 1,
+    'pmjdy_count' => 4,
+]);
+check('an SSS entry is created', $sssId > 0);
+check('the same agent and day is found rather than duplicated',
+    \App\Models\SssEnrollment::findForDate($agent1Id, '2026-11-12') !== null);
+
+$sssSummary = \App\Models\SssEnrollment::summary('2026-11-01', '2026-11-30', $branchAId, $agent1Id);
+check('the summary totals across all four schemes', $sssSummary['total'] === 10, (string) $sssSummary['total']);
+check('the summary counts distinct days', $sssSummary['days'] === 1);
+
+// The unique key is the thing that stops a duplicated form inflating a score, so it
+// is asserted rather than assumed.
+$duplicateRejected = false;
+try {
+    \App\Models\SssEnrollment::create([
+        'agent_id' => $agent1Id,
+        'branch_id' => $branchAId,
+        'enrollment_date' => '2026-11-12',
+        'apy_count' => 99,
+    ]);
+} catch (\Throwable $e) {
+    $duplicateRejected = true;
+}
+check('a second entry for the same agent and day is refused by the database', $duplicateRejected);
+
+$duplicateTarget = false;
+try {
+    \App\Models\BcTarget::create([
+        'agent_id' => $agent1Id,
+        'target_month' => '2026-11-01',
+        'daily_visit_target' => 3,
+    ]);
+} catch (\Throwable $e) {
+    $duplicateTarget = true;
+}
+check('a second target for the same agent and month is refused', $duplicateTarget);
+
+// ---------------------------------------------------------------------------
+section('Scorecard');
+
+$scorecard = \App\Services\BcPerformanceService::scorecard('2026-08-01', '2026-08-31', $branchAId);
+check('the scorecard returns a row per agent', $scorecard !== []);
+check('rows carry a rank', isset($scorecard[0]['rank']));
+check('rows carry a score', isset($scorecard[0]['total_score']));
+check('ranks start at 1', (int) $scorecard[0]['rank'] === 1);
+
+// Dense ranking: equal scores share a rank. Competition ranking would place one of
+// two agents on identical figures above the other, which is simply false.
+$ranks = array_map(static fn (array $r): int => (int) $r['rank'], $scorecard);
+$scores = array_map(static fn (array $r): float => (float) $r['total_score'], $scorecard);
+$denseOk = true;
+foreach ($scorecard as $i => $row) {
+    if ($i === 0) {
+        continue;
+    }
+    if ($scores[$i] === $scores[$i - 1] && $ranks[$i] !== $ranks[$i - 1]) {
+        $denseOk = false;
+    }
+    if ($scores[$i] < $scores[$i - 1] && $ranks[$i] <= $ranks[$i - 1]) {
+        $denseOk = false;
+    }
+}
+check('equal scores share a rank and lower scores rank worse', $denseOk);
+$sorted = $scores;
+rsort($sorted, SORT_NUMERIC);
+check('the scorecard is sorted by score descending', $scores === $sorted);
+
+$weights = \App\Services\BcPerformanceService::weights();
+check('scoring weights are readable, so a ranking can be disputed', $weights !== []);
+$divisorsSane = true;
+foreach ($weights as $weight) {
+    if ((float) $weight['divisor'] <= 0.0) {
+        $divisorsSane = false;
+    }
+}
+check('no weight has a zero divisor to divide by', $divisorsSane);
+
+// ---------------------------------------------------------------------------
+section("Today's figures are live, not waiting for the nightly cron");
+
+// This is the bug this section exists for. scorecard() used to read
+// bc_daily_achievement, which is only written at 23:55 - so for the whole working
+// day every agent showed zero visits and a zero score on the one screen a supervisor
+// opens to see how the day is going. It did not look like missing data, it looked
+// like the agents had done nothing.
+$today = date('Y-m-d');
+
+$db->query(
+    "INSERT INTO sss_enrollment (agent_id, branch_id, enrollment_date, apy_count, pmjjby_count, pmsby_count, pmjdy_count)
+     VALUES (?, ?, ?, 2, 3, 1, 4)
+     ON DUPLICATE KEY UPDATE apy_count = VALUES(apy_count), pmjjby_count = VALUES(pmjjby_count),
+                             pmsby_count = VALUES(pmsby_count), pmjdy_count = VALUES(pmjdy_count)",
+    [$agent1Id, $branchAId, $today]
+);
+
+// Deliberately NOT running rollUpDay() first: that is the whole point.
+$db->query('DELETE FROM bc_daily_achievement WHERE agent_id = ? AND achievement_date = ?',
+    [$agent1Id, $today]);
+
+$liveToday = \App\Services\BcPerformanceService::figures($today, $today, null, $agent1Id);
+check('figures() returns a row for the agent', count($liveToday) === 1);
+$live = $liveToday[0] ?? [];
+
+check('the four schemes are read live from sss_enrollment',
+    (int) ($live['apy'] ?? -1) === 2 && (int) ($live['pmjjby'] ?? -1) === 3
+    && (int) ($live['pmsby'] ?? -1) === 1 && (int) ($live['pmjdy'] ?? -1) === 4,
+    json_encode([$live['apy'] ?? null, $live['pmjjby'] ?? null, $live['pmsby'] ?? null, $live['pmjdy'] ?? null]));
+check('the scheme total is summed', (int) ($live['sss_total'] ?? 0) === 10);
+check('an agent who filed enrolment counts as having reported',
+    (int) ($live['report_submitted'] ?? 0) === 1);
+
+$cacheRows = (int) $db->scalar(
+    'SELECT COUNT(*) FROM bc_daily_achievement WHERE agent_id = ? AND achievement_date = ?',
+    [$agent1Id, $today]
+);
+check('figures() does not need the nightly cache to exist', $cacheRows === 0);
+
+$liveScorecard = \App\Services\BcPerformanceService::scorecard($today, $today, $branchAId);
+$scoredAgent = null;
+foreach ($liveScorecard as $row) {
+    if ((int) $row['agent_id'] === $agent1Id) {
+        $scoredAgent = $row;
+    }
+}
+check('the scorecard finds the agent', $scoredAgent !== null);
+check('the scorecard shows today\'s enrolments without the cron having run',
+    (int) ($scoredAgent['apy'] ?? 0) === 2, json_encode($scoredAgent['apy'] ?? null));
+check('and therefore scores above zero for today',
+    (float) ($scoredAgent['total_score'] ?? 0) > 0.0,
+    (string) ($scoredAgent['total_score'] ?? 'null'));
+
+// rollUpDay() must agree with the live figures exactly - it persists a snapshot of
+// them rather than computing them a second way. Two implementations would mean the
+// number an agent is warned on is not the number their supervisor sees.
+$snapshot = \App\Services\BcPerformanceService::rollUpDay($agent1Id, $today);
+check('the stored snapshot matches the live visits', (int) $snapshot['visits_done'] === (int) $live['visits']);
+check('the stored snapshot matches the live contacts', (int) $snapshot['contacts_done'] === (int) $live['contacts']);
+check('the stored snapshot matches the live PTP', (int) $snapshot['ptp_done'] === (int) $live['ptp']);
+check('the stored snapshot matches the live APY', (int) $snapshot['apy_done'] === (int) $live['apy']);
+check('the stored snapshot matches the live recovery',
+    (float) $snapshot['npa_recovery_done'] === (float) $live['npa_recovery']);
+check('the stored snapshot matches the live OD-2 count',
+    (int) $snapshot['od2_renewal_done'] === (int) $live['od2_renewal']);
+
+// A range that spans a real visit must count it from visit_reports, never from a
+// counter somebody could have typed.
+$august = \App\Services\BcPerformanceService::figures('2026-08-01', '2026-08-31', null, $agent1Id);
+$augustRow = $august[0] ?? [];
+$countedVisits = (int) $db->scalar(
+    'SELECT COUNT(*) FROM visit_reports WHERE agent_id = ? AND visit_date BETWEEN ? AND ?',
+    [$agent1Id, '2026-08-01', '2026-08-31']
+);
+check('visits are counted from visit_reports, not from a stored counter',
+    (int) ($augustRow['visits'] ?? -1) === $countedVisits,
+    ($augustRow['visits'] ?? 'null') . ' vs ' . $countedVisits);
+
+// Joining visit_reports, promises and sss_enrollment in one statement multiplies the
+// rows; the correlated subqueries exist so a visit is not counted once per promise.
+$promiseCount = (int) $db->scalar(
+    'SELECT COUNT(*) FROM promises WHERE agent_id = ? AND DATE(created_at) BETWEEN ? AND ?',
+    [$agent1Id, '2026-08-01', '2026-08-31']
+);
+check('a visit is not multiplied by the promises attached to it',
+    $promiseCount === 0 || (int) $augustRow['visits'] <= $countedVisits);
+
+// ---------------------------------------------------------------------------
+section('Visit counters repair themselves');
+
+// refreshVisitCounters() only ever runs for the account just visited, so a drifted
+// row stays wrong until somebody happens to visit that borrower again - which for a
+// closed account may be never. last_visit_at drives the "no visit for N days" nudge,
+// so a count that is too high silently suppresses a reminder.
+$driftLead = (int) $db->scalar('SELECT id FROM loan_accounts WHERE visit_count > 0 LIMIT 1');
+check('a lead with visits exists to test against', $driftLead > 0);
+
+$db->query('UPDATE loan_accounts SET visit_count = 99, last_visit_at = NULL WHERE id = ?', [$driftLead]);
+$repaired = \App\Models\LoanAccount::rebuildVisitCounters();
+check('the drifted row was repaired', $repaired >= 1, (string) $repaired);
+
+$fixed = $db->first('SELECT visit_count, last_visit_at FROM loan_accounts WHERE id = ?', [$driftLead]);
+$trueCount = (int) $db->scalar('SELECT COUNT(*) FROM visit_reports WHERE loan_account_id = ?', [$driftLead]);
+check('visit_count now matches COUNT(visit_reports)', (int) $fixed['visit_count'] === $trueCount,
+    $fixed['visit_count'] . ' vs ' . $trueCount);
+check('last_visit_at was restored', $fixed['last_visit_at'] !== null);
+
+// Idempotent, and the return value is a real signal: a second run must report zero,
+// otherwise "rows corrected" cannot be used to detect writes outside VisitService.
+$secondRun = \App\Models\LoanAccount::rebuildVisitCounters();
+check('a second run corrects nothing', $secondRun === 0, (string) $secondRun);
+
+check('no lead is left with a wrong visit_count', (int) $db->scalar(
+    'SELECT COUNT(*) FROM loan_accounts la
+      WHERE la.visit_count <> (SELECT COUNT(*) FROM visit_reports vr WHERE vr.loan_account_id = la.id)'
+) === 0);
+
+// ---------------------------------------------------------------------------
+section('The daily report deadline');
+
+// The settings screen has no per-type validation, so this value can be whatever a
+// browser posted. The app builds an alarm from it, and a blank reaching the phone
+// would either break the scheduler or mean "no deadline" - the one reading nobody
+// wants for a deadline agents are measured against.
+foreach ([
+    ['17:00', '17:00'],
+    ['9:30',  '09:30'],
+    ['00:00', '00:00'],
+    ['23:59', '23:59'],
+    ['',      '17:00'],
+    ['   ',   '17:00'],
+    ['5pm',   '17:00'],
+    ['17',    '17:00'],
+    ['24:00', '17:00'],
+    ['17:60', '17:00'],
+    ['abc',   '17:00'],
+] as [$stored, $expected]) {
+    Settings::updateMany(['daily_report_due_time' => $stored], null);
+    $resolved = \App\Controllers\Api\MetaController::reportDueTime();
+    check(
+        sprintf('deadline %s resolves to %s', $stored === '' ? '(blank)' : $stored, $expected),
+        $resolved === $expected,
+        $resolved
+    );
+}
+
+Settings::updateMany(['daily_report_due_time' => '17:00'], null);
+check('the reminder master switch defaults on', Settings::bool('daily_report_reminder_enabled'));
+Settings::updateMany(['daily_report_reminder_enabled' => '0'], null);
+check('and can be turned off for everyone', Settings::bool('daily_report_reminder_enabled') === false);
+Settings::updateMany(['daily_report_reminder_enabled' => '1'], null);
+
+// The alarm repeats until the report is in, and both numbers are the bank's. Same
+// treatment as the deadline: whatever a browser posted is clamped on the way out, because
+// the settings screen has no per-type validation and these drive an alarm on a phone.
+foreach ([
+    ['15',  15],
+    ['30',  30],
+    ['0',    0],   // A real choice: one reminder, no repeating.
+    ['1',    5],   // A phone buzzing every minute is not a firmer reminder.
+    ['4',    5],
+    ['600', 240],
+    ['',    15],
+    ['abc', 15],
+    ['-5',  15],   // Not numeric once the sign is there, so it falls back.
+] as [$stored, $expected]) {
+    Settings::updateMany(['daily_report_reminder_repeat_minutes' => $stored], null);
+    $resolved = \App\Controllers\Api\MetaController::reminderRepeatMinutes();
+    check(
+        sprintf('repeat %s resolves to %d', $stored === '' ? '(blank)' : $stored, $expected),
+        $resolved === $expected,
+        (string) $resolved
+    );
+}
+
+foreach ([
+    ['22', 22],
+    ['0',   0],
+    ['23', 23],
+    ['24', 23],
+    ['99', 23],
+    ['',   22],
+    ['xx', 22],
+] as [$stored, $expected]) {
+    Settings::updateMany(['daily_report_reminder_until_hour' => $stored], null);
+    $resolved = \App\Controllers\Api\MetaController::reminderUntilHour();
+    check(
+        sprintf('cutoff hour %s resolves to %d', $stored === '' ? '(blank)' : $stored, $expected),
+        $resolved === $expected,
+        (string) $resolved
+    );
+}
+
+Settings::updateMany([
+    'daily_report_reminder_repeat_minutes' => '15',
+    'daily_report_reminder_until_hour'     => '22',
+], null);
+
+// The agent has no say in any of it, which is the point of moving these server-side. If a
+// per-agent override ever appears in the settings table, this fails and says why.
+$agentOwned = (int) $db->scalar(
+    "SELECT COUNT(*) FROM settings
+      WHERE setting_key LIKE '%reminder%' AND setting_key LIKE '%agent%'"
+);
+check('no per-agent reminder setting exists', $agentOwned === 0, (string) $agentOwned);
+
+// ---------------------------------------------------------------------------
+section('Hand-corrected loan figures survive the next import');
+
+// Making the figures editable is only half the feature. The other half is that the
+// next import must not put the old number back, because that failure is silent: the
+// panel shows the corrected figure the day somebody fixes it and the wrong one again
+// the morning after the nightly import.
+$editable = LoanAccount::find($leadId);
+$changed = LoanAccount::applyManualEdit($leadId, ['closure_amount' => '161500.00'], 1);
+check('a corrected figure reports what moved', array_key_exists('closure_amount', $changed));
+check('and carries the value it replaced',
+    array_key_exists('from', $changed['closure_amount'] ?? [])
+    && (string) ($changed['closure_amount']['from'] ?? '') === (string) ($editable['closure_amount'] ?? ''),
+    json_encode($changed['closure_amount'] ?? null));
+check('the figure had no imported value to begin with', $editable['closure_amount'] === null,
+    var_export($editable['closure_amount'], true));
+
+$edited = LoanAccount::find($leadId);
+check('the figure is stored', abs((float) $edited['closure_amount'] - 161500.0) < 0.01, (string) $edited['closure_amount']);
+check('the column is marked as hand-edited',
+    in_array('closure_amount', LoanAccount::overriddenColumns($edited['manual_overrides'] ?? null), true),
+    (string) ($edited['manual_overrides'] ?? ''));
+$overrideMeta = json_decode((string) $edited['manual_overrides'], true);
+check('the override names who did it', (int) ($overrideMeta['closure_amount']['by'] ?? 0) === 1);
+check('and when', ($overrideMeta['closure_amount']['at'] ?? '') !== '');
+
+// The comparison has to be loose or a no-op save marks every figure as overridden,
+// which would stop the importer updating anything at all on that row.
+check('re-saving the same figure is not an edit',
+    LoanAccount::applyManualEdit($leadId, ['closure_amount' => '161500.00'], 1) === []);
+check('1000 and "1000.00" are the same figure',
+    LoanAccount::applyManualEdit($leadId, ['closure_amount' => 161500], 1) === []);
+check('only closure_amount is overridden so far',
+    LoanAccount::overriddenColumns(LoanAccount::find($leadId)['manual_overrides'] ?? null) === ['closure_amount'],
+    json_encode(LoanAccount::overriddenColumns(LoanAccount::find($leadId)['manual_overrides'] ?? null)));
+
+// The override guard is observed on the outstanding balance, which is the figure a
+// branch actually rings up about. (An earlier version of this comment claimed the
+// settlement figures were panel-only; ots_amount and deposit_amount were always
+// written by the importer, and closure_amount is now too.)
+LoanAccount::applyManualEdit($leadId, ['outstanding_amount' => '147250.00'], 1);
+check('the outstanding balance is corrected by hand',
+    abs((float) LoanAccount::find($leadId)['outstanding_amount'] - 147250.0) < 0.01);
+
+// A column outside the whitelist must be ignored rather than trusted: this array
+// arrives from a browser post.
+LoanAccount::applyManualEdit($leadId, ['loan_account_number' => 'HIJACKED', 'current_status' => 'closed'], 1);
+$untouched = LoanAccount::find($leadId);
+check('a non-editable column is ignored', (string) $untouched['loan_account_number'] === 'LN1001',
+    (string) $untouched['loan_account_number']);
+check('status is not editable this way', (string) $untouched['current_status'] !== 'closed');
+
+// is_npa is derived from npa_date, so it has to follow it.
+LoanAccount::applyManualEdit($leadId, ['npa_date' => null], 1);
+check('clearing the NPA date clears the NPA flag', (int) LoanAccount::find($leadId)['is_npa'] === 0);
+LoanAccount::applyManualEdit($leadId, ['npa_date' => '2024-06-30'], 1);
+check('setting it again re-flags the account', (int) LoanAccount::find($leadId)['is_npa'] === 1);
+
+// Now the actual promise: an import carrying different numbers for the same account.
+$overrideCsv = $workDir . '/override.csv';
+file_put_contents($overrideCsv, implode("\n", [
+    'Branch,Loan Account Number,Customer Name,Mobile,Village,Loan Type,Outstanding Amount,Overdue Amount',
+    'BR001,LN1001,Ramesh Kumar,9876543210,Kotri,Crop Loan,150000,41000',
+]));
+
+$overrideResult = ImportService::run(
+    ['name' => 'override.csv', 'tmp_name' => $overrideCsv, 'error' => UPLOAD_ERR_OK, 'size' => filesize($overrideCsv)],
+    null,
+    null,
+    1,
+    'System Administrator'
+);
+
+$afterImport = LoanAccount::find($leadId);
+check('the import updated the row', $overrideResult['updated'] === 1, 'updated=' . $overrideResult['updated']);
+check('the hand-corrected balance survived the import',
+    abs((float) $afterImport['outstanding_amount'] - 147250.0) < 0.01, (string) $afterImport['outstanding_amount']);
+check('the file did not quietly win',
+    abs((float) $afterImport['outstanding_amount'] - 150000.0) > 0.01);
+check('a column nobody corrected still updates',
+    abs((float) $afterImport['overdue_amount'] - 41000.0) < 0.01, (string) $afterImport['overdue_amount']);
+check('the skip is reported, not silent',
+    in_array('outstanding_amount', $overrideResult['skipped_overrides']['LN1001'] ?? [], true),
+    json_encode($overrideResult['skipped_overrides']));
+// Every overridden column the file carries is named - the hand-set NPA date is one
+// of them, and a report that named only some of them would be worse than none.
+check('the hand-set NPA date is reported too',
+    in_array('npa_date', $overrideResult['skipped_overrides']['LN1001'] ?? [], true),
+    json_encode($overrideResult['skipped_overrides']['LN1001'] ?? []));
+check('and nothing the file never carried is claimed as skipped',
+    !in_array('closure_amount', $overrideResult['skipped_overrides']['LN1001'] ?? [], true),
+    'this file has no Closure Amount column, so there is nothing to skip');
+check('untouched accounts are not listed',
+    !array_key_exists('LN1002', $overrideResult['skipped_overrides']),
+    json_encode(array_keys($overrideResult['skipped_overrides'])));
+check('a column the file omits is left alone entirely',
+    abs((float) $afterImport['closure_amount'] - 161500.0) < 0.01, (string) $afterImport['closure_amount']);
+
+// closure_amount IS importable now, so the guard has to hold for it as well - and a
+// file that does carry the column must be reported as skipped rather than silently
+// declined.
+$closureCsv = $workDir . '/closure.csv';
+file_put_contents($closureCsv, implode("\n", [
+    'Branch,Loan Account Number,Customer Name,Closure Amount,Asset Classification,DPD,'
+        . 'Rate of Interest,EMI,Last Paid Date,Last Paid Amount,Security Value,Guarantor,'
+        . 'Maturity Date,Purpose',
+    'BR001,LN1001,Ramesh Kumar,999999,DOUBTFUL-II,412,7.25,12500,12/08/2024,5000,450000,'
+        . 'Mohan Lal,31/03/2027,Wheat cultivation',
+    'BR001,LN1002,Sita Devi,88000,SS,95,9.5,4000,01/07/2024,2500,120000,Radha Bai,'
+        . '30/06/2026,Dairy',
+]));
+
+$closureResult = ImportService::run(
+    ['name' => 'closure.csv', 'tmp_name' => $closureCsv, 'error' => UPLOAD_ERR_OK, 'size' => filesize($closureCsv)],
+    null, null, 1, 'System Administrator'
+);
+
+$afterClosure = LoanAccount::find($leadId);
+check('a hand-set closure amount survives a file that carries the column',
+    abs((float) $afterClosure['closure_amount'] - 161500.0) < 0.01,
+    (string) $afterClosure['closure_amount']);
+check('and the skip is reported for it',
+    in_array('closure_amount', $closureResult['skipped_overrides']['LN1001'] ?? [], true),
+    json_encode($closureResult['skipped_overrides']['LN1001'] ?? []));
+
+// The lead nobody hand-edited takes every column from the file, which is the point of
+// widening the importer in the first place.
+$fresh = LoanAccount::findByNumber('LN1002');
+check('an un-edited lead takes the closure amount from the file',
+    abs((float) $fresh['closure_amount'] - 88000.0) < 0.01, (string) $fresh['closure_amount']);
+check('the asset classification is normalised from the bank\'s spelling',
+    (string) $fresh['asset_classification'] === 'Sub-Standard', (string) $fresh['asset_classification']);
+check('and a different spelling normalises to the same canonical set',
+    (string) $afterClosure['asset_classification'] === 'Doubtful-2',
+    (string) $afterClosure['asset_classification']);
+check('days past due is stored as the bank gave it',
+    (int) $fresh['days_past_due'] === 95, (string) $fresh['days_past_due']);
+check('the interest rate keeps its decimals',
+    abs((float) $fresh['interest_rate'] - 9.5) < 0.0001, (string) $fresh['interest_rate']);
+check('the instalment lands', abs((float) $fresh['installment_amount'] - 4000.0) < 0.01);
+check('the last payment date is parsed as d/m/Y',
+    (string) $fresh['last_payment_date'] === '2024-07-01', (string) $fresh['last_payment_date']);
+check('the last payment amount lands', abs((float) $fresh['last_payment_amount'] - 2500.0) < 0.01);
+check('the security value lands', abs((float) $fresh['security_value'] - 120000.0) < 0.01);
+check('the guarantor lands', (string) $fresh['guarantor_name'] === 'Radha Bai');
+check('the maturity date lands', (string) $fresh['maturity_date'] === '2026-06-30',
+    (string) $fresh['maturity_date']);
+check('the purpose lands', (string) $fresh['purpose'] === 'Dairy');
+
+// A spelling nobody anticipated is kept verbatim rather than thrown away - it is the
+// most useful prioritisation column in the file, and a NULL would be worse than an
+// unfamiliar string somebody can read.
+$oddCsv = $workDir . '/odd-classification.csv';
+file_put_contents($oddCsv, implode("\n", [
+    'Branch,Loan Account Number,Customer Name,Asset Classification',
+    'BR001,LN1002,Sita Devi,Watch Category B',
+]));
+ImportService::run(
+    ['name' => 'odd.csv', 'tmp_name' => $oddCsv, 'error' => UPLOAD_ERR_OK, 'size' => filesize($oddCsv)],
+    null, null, 1, 'System Administrator'
+);
+check('an unrecognised classification is stored, not discarded',
+    (string) LoanAccount::findByNumber('LN1002')['asset_classification'] === 'Watch Category B',
+    (string) LoanAccount::findByNumber('LN1002')['asset_classification']);
+
+// ---------------------------------------------------------------------------
+section('Corrections to a filed report');
+
+$reportId = (int) $visit1['visit_id'];
+$filedName = (string) VisitReport::find($reportId)['customer_name'];
+
+$rev1 = VisitReport::applyRevision(
+    $reportId,
+    ['customer_name' => 'Ramesh Kumar Yadav', 'village' => 'Kotri'],
+    1,
+    'System Administrator',
+    'Name misspelled at data entry',
+    '127.0.0.1'
+);
+check('a correction is revision 1', $rev1 === 1, var_export($rev1, true));
+check('the report now reads correctly',
+    (string) VisitReport::find($reportId)['customer_name'] === 'Ramesh Kumar Yadav');
+check('the revision count is on the report', (int) VisitReport::find($reportId)['revision_count'] === 1);
+
+$revisions = VisitReport::revisions($reportId);
+check('the correction was recorded', count($revisions) === 1, (string) count($revisions));
+check('only the field that moved is in it',
+    array_keys($revisions[0]['changes_decoded']) === ['customer_name'],
+    json_encode(array_keys($revisions[0]['changes_decoded'])));
+check('with the value as filed',
+    (string) $revisions[0]['changes_decoded']['customer_name']['from'] === $filedName);
+check('and the value as corrected',
+    (string) $revisions[0]['changes_decoded']['customer_name']['to'] === 'Ramesh Kumar Yadav');
+check('the reason is kept', (string) $revisions[0]['reason'] === 'Name misspelled at data entry');
+check('so is who made it', (string) $revisions[0]['changed_by_name'] === 'System Administrator');
+
+// A save with no edits must not manufacture a revision, or the count printed on the
+// report stops meaning anything.
+check('saving with nothing changed files no revision',
+    VisitReport::applyRevision($reportId, ['customer_name' => 'Ramesh Kumar Yadav'], 1, 'A', 'no reason', null) === null);
+check('the count did not move', (int) VisitReport::find($reportId)['revision_count'] === 1);
+check('blank and null are the same absence',
+    VisitReport::applyRevision($reportId, ['family_member_name' => ''], 1, 'A', 'r', null) === null);
+
+// The agent's assertions are not the reviewer's to overwrite.
+$beforeAssertions = VisitReport::find($reportId);
+check('the recommendation is not correctable',
+    VisitReport::applyRevision($reportId, ['rec_regular_followup' => 0, 'remarks' => 'rewritten'], 1, 'A', 'r', null) === null);
+$afterAssertions = VisitReport::find($reportId);
+check('remarks are untouched', (string) $afterAssertions['remarks'] === (string) $beforeAssertions['remarks']);
+check('tick boxes are untouched',
+    (int) $afterAssertions['rec_regular_followup'] === (int) $beforeAssertions['rec_regular_followup']);
+
+$rev2 = VisitReport::applyRevision($reportId, ['village' => 'Kotri Kalan'], 1, 'System Administrator', 'Village corrected', null);
+check('the next correction is revision 2', $rev2 === 2, var_export($rev2, true));
+check('revisions read newest first', (int) VisitReport::revisions($reportId)[0]['revision_no'] === 2);
+check('nothing overwrote revision 1',
+    count(VisitReport::revisions($reportId)) === 2, (string) count(VisitReport::revisions($reportId)));
+
+// The submitted original has to be reconstructible, or "append-only" is a slogan.
+$replay = VisitReport::find($reportId);
+$current = ['customer_name' => (string) $replay['customer_name'], 'village' => (string) $replay['village']];
+foreach (VisitReport::revisions($reportId) as $revision) {
+    foreach ($revision['changes_decoded'] as $column => $delta) {
+        $current[$column] = (string) ($delta['from'] ?? '');
+    }
+}
+check('replaying the corrections backwards returns the filed report',
+    $current['customer_name'] === $filedName && $current['village'] === 'Kotri',
+    json_encode($current));
+
+// Approval is additive: it must not disturb a single thing the agent submitted.
+$beforeApproval = VisitReport::find($reportId);
+VisitReport::recordApproval($reportId, [
+    'approval_status'          => 'approved',
+    'approved_by'              => 1,
+    'approver_name'            => 'System Administrator',
+    'approved_at'              => date('Y-m-d H:i:s'),
+    'approval_remarks'         => 'Verified against the branch register',
+    'approval_gps_latitude'    => 26.9124,
+    'approval_gps_longitude'   => 75.7873,
+    'approval_gps_accuracy_m'  => 12,
+    'approval_gps_source'      => 'device',
+]);
+$approved = VisitReport::find($reportId);
+check('the report is approved', (string) $approved['approval_status'] === 'approved');
+check('the approver is named', (string) $approved['approver_name'] === 'System Administrator');
+check('the approver position is kept', abs((float) $approved['approval_gps_latitude'] - 26.9124) < 0.0001);
+check('the position source is kept distinct', (string) $approved['approval_gps_source'] === 'device');
+check('approval changed nothing the agent wrote',
+    (string) $approved['remarks'] === (string) $beforeApproval['remarks']
+    && (string) $approved['customer_name'] === (string) $beforeApproval['customer_name']);
+check('approval is not a revision', (int) $approved['revision_count'] === 2);
+check('an approval event has a timeline label',
+    isset(Timeline::EVENTS['visit_approved'], Timeline::EVENTS['visit_rejected'], Timeline::EVENTS['visit_revised']));
+
+// ---------------------------------------------------------------------------
+section('Fields the user adds themselves');
+
+check('a label becomes a readable key', \App\Models\CustomField::keyFrom('PAN Number') === 'pan_number',
+    \App\Models\CustomField::keyFrom('PAN Number'));
+check('punctuation collapses', \App\Models\CustomField::keyFrom('  Spouse\'s Occupation / Trade  ') === 'spouse_s_occupation_trade',
+    \App\Models\CustomField::keyFrom('  Spouse\'s Occupation / Trade  '));
+check('a label with no letters still yields a key', \App\Models\CustomField::keyFrom('###') === 'field');
+check('keys are capped to the column', strlen(\App\Models\CustomField::keyFrom(str_repeat('a', 200))) === 60);
+
+$panId = \App\Models\CustomField::create([
+    'entity' => 'customer', 'field_key' => \App\Models\CustomField::uniqueKey('customer', 'PAN Number'),
+    'label' => 'PAN Number', 'field_type' => 'text', 'is_required' => 0, 'show_in_report' => 1,
+    'sort_order' => 1, 'status' => 'active', 'created_by' => 1,
+]);
+$dupKey = \App\Models\CustomField::uniqueKey('customer', 'PAN Number');
+check('a second field with the same label gets its own key', $dupKey === 'pan_number_2', $dupKey);
+check('the same label on another entity is free',
+    \App\Models\CustomField::uniqueKey('loan_account', 'PAN Number') === 'pan_number');
+
+$limitId = \App\Models\CustomField::create([
+    'entity' => 'customer', 'field_key' => \App\Models\CustomField::uniqueKey('customer', 'Sanctioned Limit'),
+    'label' => 'Sanctioned Limit', 'field_type' => 'money', 'is_required' => 0, 'show_in_report' => 0,
+    'sort_order' => 2, 'status' => 'active', 'created_by' => 1,
+]);
+$visitedId = \App\Models\CustomField::create([
+    'entity' => 'customer', 'field_key' => \App\Models\CustomField::uniqueKey('customer', 'Shop Verified'),
+    'label' => 'Shop Verified', 'field_type' => 'toggle', 'is_required' => 0, 'show_in_report' => 1,
+    'sort_order' => 3, 'status' => 'active', 'created_by' => 1,
+]);
+$dobId = \App\Models\CustomField::create([
+    'entity' => 'customer', 'field_key' => \App\Models\CustomField::uniqueKey('customer', 'Date Of Birth'),
+    'label' => 'Date Of Birth', 'field_type' => 'date', 'is_required' => 0, 'show_in_report' => 0,
+    'sort_order' => 4, 'status' => 'active', 'created_by' => 1,
+]);
+$dependentsId = \App\Models\CustomField::create([
+    'entity' => 'customer', 'field_key' => \App\Models\CustomField::uniqueKey('customer', 'Dependents'),
+    'label' => 'Dependents', 'field_type' => 'number', 'is_required' => 0, 'show_in_report' => 0,
+    'sort_order' => 5, 'status' => 'active', 'created_by' => 1,
+]);
+
+$customerId = (int) LoanAccount::find($leadId)['customer_id'];
+$saved = \App\Models\CustomField::saveValues('customer', $customerId, [
+    'pan_number'       => '  ABCDE1234F ',
+    'sanctioned_limit' => '175000',
+    'shop_verified'    => '1',
+    'date_of_birth'    => '15 January 1980',
+    'dependents'       => '4.7',
+], 1);
+check('saving reports which fields changed', count($saved) === 5, json_encode($saved));
+
+$values = \App\Models\CustomField::valuesFor('customer', $customerId);
+check('text is trimmed', ($values['pan_number'] ?? '') === 'ABCDE1234F', json_encode($values['pan_number'] ?? null));
+check('money is stored to 2dp', ($values['sanctioned_limit'] ?? '') === '175000.00', (string) ($values['sanctioned_limit'] ?? ''));
+check('a toggle stores a real yes', ($values['shop_verified'] ?? '') === '1');
+check('a date is normalised, not stored as typed',
+    ($values['date_of_birth'] ?? '') === '1980-01-15', (string) ($values['date_of_birth'] ?? ''));
+check('a number is stored as a whole number', ($values['dependents'] ?? '') === '4', (string) ($values['dependents'] ?? ''));
+
+// An unparseable date must not be stored verbatim, or it sorts as nonsense forever.
+\App\Models\CustomField::saveValues('customer', $customerId, ['date_of_birth' => 'sometime in the monsoon'], 1);
+check('an unreadable date is refused rather than kept',
+    (\App\Models\CustomField::valuesFor('customer', $customerId)['date_of_birth'] ?? null) === null);
+
+// "Not recorded" and "recorded as empty" have to stay distinguishable.
+\App\Models\CustomField::saveValues('customer', $customerId, ['pan_number' => '   '], 1);
+check('a blank answer deletes the row',
+    (int) $db->scalar('SELECT COUNT(*) FROM custom_field_values WHERE definition_id = ? AND entity_id = ?',
+        [$panId, $customerId]) === 0);
+check('not just stored as an empty string',
+    !array_key_exists('pan_number', \App\Models\CustomField::valuesFor('customer', $customerId)));
+
+// An unchecked box is an answer, not an absence.
+\App\Models\CustomField::saveValues('customer', $customerId, ['shop_verified' => '0'], 1);
+check('an unchecked toggle stores a real no',
+    (\App\Models\CustomField::valuesFor('customer', $customerId)['shop_verified'] ?? null) === '0');
+
+// A field absent from the post was not on the form.
+\App\Models\CustomField::saveValues('customer', $customerId, ['dependents' => '5'], 1);
+check('a field absent from the submission is left alone',
+    (\App\Models\CustomField::valuesFor('customer', $customerId)['sanctioned_limit'] ?? '') === '175000.00');
+
+// Double submit must not give one field two answers.
+\App\Models\CustomField::saveValues('customer', $customerId, ['dependents' => '6'], 1);
+\App\Models\CustomField::saveValues('customer', $customerId, ['dependents' => '6'], 1);
+check('one field holds one answer',
+    (int) $db->scalar('SELECT COUNT(*) FROM custom_field_values WHERE definition_id = ? AND entity_id = ?',
+        [$dependentsId, $customerId]) === 1);
+
+$joined = \App\Models\CustomField::withValues('customer', $customerId);
+$byKey = [];
+foreach ($joined as $definition) {
+    $byKey[(string) $definition['field_key']] = $definition;
+}
+check('definitions come back joined to answers', ($byKey['dependents']['value'] ?? '') === '6');
+check('an unanswered field is present with no value', array_key_exists('pan_number', $byKey)
+    && $byKey['pan_number']['value'] === null);
+check('only fields marked for print are flagged', (int) $byKey['shop_verified']['show_in_report'] === 1
+    && (int) $byKey['sanctioned_limit']['show_in_report'] === 0);
+
+// Retiring a field keeps the answers; deleting destroys them, which is why the two
+// are separate actions.
+\App\Models\CustomField::update($limitId, ['status' => 'inactive']);
+$activeKeys = array_column(\App\Models\CustomField::definitions('customer'), 'field_key');
+check('a retired field drops off the form', !in_array('sanctioned_limit', $activeKeys, true), json_encode($activeKeys));
+check('but its answers are still there', \App\Models\CustomField::answerCount($limitId) === 1,
+    (string) \App\Models\CustomField::answerCount($limitId));
+check('and a retired field ignores new submissions',
+    \App\Models\CustomField::saveValues('customer', $customerId, ['sanctioned_limit' => '1'], 1) === []);
+check('a retired field is still listed for management',
+    in_array('sanctioned_limit', array_column(\App\Models\CustomField::all(), 'field_key'), true));
+
+\App\Models\CustomField::delete($limitId);
+check('deleting the definition takes the answers with it',
+    (int) $db->scalar('SELECT COUNT(*) FROM custom_field_values WHERE definition_id = ?', [$limitId]) === 0);
+check('other fields are unaffected',
+    (\App\Models\CustomField::valuesFor('customer', $customerId)['dependents'] ?? '') === '6');
+
+// Answers belong to one record, not to the entity type.
+$otherCustomerId = (int) LoanAccount::findByNumber('LN1002')['customer_id'];
+check('another borrower has no answers yet',
+    \App\Models\CustomField::valuesFor('customer', $otherCustomerId) === []);
+\App\Models\CustomField::saveValues('customer', $otherCustomerId, ['dependents' => '2'], 1);
+check('answers do not leak between records',
+    (\App\Models\CustomField::valuesFor('customer', $customerId)['dependents'] ?? '') === '6'
+    && (\App\Models\CustomField::valuesFor('customer', $otherCustomerId)['dependents'] ?? '') === '2');
+
+// A loan-account field with the same key must not collide with the customer one.
+$loanFieldId = \App\Models\CustomField::create([
+    'entity' => 'loan_account', 'field_key' => \App\Models\CustomField::uniqueKey('loan_account', 'Dependents'),
+    'label' => 'Dependents', 'field_type' => 'number', 'is_required' => 0, 'show_in_report' => 0,
+    'sort_order' => 1, 'status' => 'active', 'created_by' => 1,
+]);
+\App\Models\CustomField::saveValues('loan_account', $leadId, ['dependents' => '9'], 1);
+check('the same key on two entities holds two answers',
+    (\App\Models\CustomField::valuesFor('customer', $customerId)['dependents'] ?? '') === '6'
+    && (\App\Models\CustomField::valuesFor('loan_account', $leadId)['dependents'] ?? '') === '9');
+check('a visit-report field is a third namespace',
+    \App\Models\CustomField::valuesFor('visit_report', $reportId) === []);
+
+// ---------------------------------------------------------------------------
+section('The agent\'s own photograph, and where it was taken');
+
+// Consent first: every coordinate in the system is gated on it server-side, so a test
+// that skipped this would prove the gate works and nothing else.
+\App\Services\TrackingService::recordConsent($agent1Id, '127.0.0.1', 'itest');
+
+$pixel = base64_encode((string) file_get_contents(__DIR__ . '/fixtures/pixel.png'));
+$geoVisit = VisitService::submit([
+    'loan_account_id' => $leadId,
+    'visit_date'      => date('Y-m-d'),
+    'visit_time'      => '11:45',
+    'customer_met'    => '1',
+    'client_uuid'     => 'geo00001-1111-2222-3333-444444444444',
+
+    'gps_source'      => 'device',
+    'gps_latitude'    => '26.9124000',
+    'gps_longitude'   => '75.7873000',
+    'gps_accuracy_m'  => '11',
+
+    // The agent's own photograph, taken at the door.
+    'agent_photo_base64'      => $pixel,
+    'agent_photo_source'      => 'camera',
+    'agent_photo_gps_source'  => 'camera',
+    'agent_photo_latitude'    => '26.9125000',
+    'agent_photo_longitude'   => '75.7874000',
+    'agent_photo_accuracy_m'  => '7',
+    'agent_photo_captured_at' => date('Y-m-d H:i:s', time() - 600),
+
+    // A gallery pick, which must never inherit a position.
+    'house_photo_base64' => $pixel,
+    'house_photo_source' => 'gallery',
+], $agentCtx);
+
+$geoVisitId = (int) $geoVisit['visit_id'];
+$geoPhotos = [];
+foreach (VisitReport::photos($geoVisitId) as $row) {
+    $geoPhotos[(string) $row['photo_type']] = $row;
+}
+
+check('the agent photograph is stored as its own type', isset($geoPhotos['agent']),
+    implode(',', array_keys($geoPhotos)));
+check('it carries its own fix, not the visit\'s',
+    abs((float) ($geoPhotos['agent']['gps_latitude'] ?? 0) - 26.9125) < 0.00001,
+    (string) ($geoPhotos['agent']['gps_latitude'] ?? 'null'));
+check('and its own accuracy', (int) ($geoPhotos['agent']['gps_accuracy_m'] ?? 0) === 7);
+check('and is recorded as a camera capture',
+    (string) ($geoPhotos['agent']['capture_source'] ?? '') === 'camera');
+
+// captured_at held NULL for every photograph ever filed because nothing wrote it.
+check('the capture time is finally recorded',
+    ($geoPhotos['agent']['captured_at'] ?? null) !== null);
+check('and it is the device\'s time, not the moment the row was written',
+    ($geoPhotos['agent']['captured_at'] ?? '') < date('Y-m-d H:i:s', time() - 60),
+    (string) ($geoPhotos['agent']['captured_at'] ?? 'null'));
+
+check('a gallery photograph still refuses a position',
+    ($geoPhotos['house']['gps_latitude'] ?? null) === null);
+check('and refuses a capture time it was never given',
+    ($geoPhotos['house']['captured_at'] ?? null) === null);
+
+// Consent is the gate, and it is checked on the server rather than trusted from the
+// app. This used to be asserted through a signature coordinate; the visit's own
+// position runs the identical three rules, so the gate is still covered.
+\App\Services\TrackingService::withdrawConsent($agent1Id, '127.0.0.1', 'itest');
+$withdrawnVisit = VisitService::submit([
+    'loan_account_id' => $leadId,
+    'visit_date'      => date('Y-m-d'),
+    'visit_time'      => '12:15',
+    'client_uuid'     => 'geo00002-1111-2222-3333-444444444444',
+    'gps_source'      => 'device',
+    'gps_latitude'    => '26.9126000',
+    'gps_longitude'   => '75.7875000',
+], $agentCtx);
+
+$withdrawnReport = VisitReport::find((int) $withdrawnVisit['visit_id']) ?? [];
+check('without consent a coordinate is refused',
+    ($withdrawnReport['gps_latitude'] ?? null) === null);
+check('and it is recorded as declined, not as no signal',
+    (string) ($withdrawnReport['gps_source'] ?? '') === 'denied',
+    (string) ($withdrawnReport['gps_source'] ?? 'null'));
+
+\App\Services\TrackingService::recordConsent($agent1Id, '127.0.0.1', 'itest');
+
+// An implausible fix is discarded rather than stored - (0,0) is a real place in the
+// Gulf of Guinea, so recording it would put every agent without a signal there.
+$nullIslandVisit = VisitService::submit([
+    'loan_account_id' => $leadId,
+    'visit_date'      => date('Y-m-d'),
+    'visit_time'      => '12:45',
+    'client_uuid'     => 'geo00003-1111-2222-3333-444444444444',
+    'gps_source'      => 'device',
+    'gps_latitude'    => '0',
+    'gps_longitude'   => '0',
+], $agentCtx);
+
+$nullIsland = VisitReport::find((int) $nullIslandVisit['visit_id']) ?? [];
+check('a (0,0) fix is thrown away',
+    ($nullIsland['gps_latitude'] ?? null) === null);
+check('and reported as unavailable rather than declined',
+    (string) ($nullIsland['gps_source'] ?? '') === 'unavailable',
+    (string) ($nullIsland['gps_source'] ?? 'null'));
+
+// A device clock running ahead is clamped: a photograph stamped next week would sort
+// ahead of everything real forever.
+$futureVisit = VisitService::submit([
+    'loan_account_id' => $leadId,
+    'visit_date'      => date('Y-m-d'),
+    'visit_time'      => '13:15',
+    'client_uuid'     => 'geo00004-1111-2222-3333-444444444444',
+    'agent_photo_base64'      => $pixel,
+    'agent_photo_source'      => 'camera',
+    'agent_photo_gps_source'  => 'camera',
+    'agent_photo_latitude'    => '26.9125000',
+    'agent_photo_longitude'   => '75.7874000',
+    'agent_photo_captured_at' => date('Y-m-d H:i:s', time() + 86400),
+], $agentCtx);
+
+$futurePhoto = VisitReport::photos((int) $futureVisit['visit_id'])[0] ?? [];
+check('a capture time from tomorrow is clamped to now',
+    ($futurePhoto['captured_at'] ?? '') <= date('Y-m-d H:i:s', time() + 5),
+    (string) ($futurePhoto['captured_at'] ?? 'null'));
+
+// ---------------------------------------------------------------------------
+section('Leads spread evenly across a branch, and stay that way');
+
+// Branch A has agent1 and agent2 seeded on it. The whole point of this section is the
+// second import: dealing rows out in turn looks fair within one file and is not, because
+// two files both start at the same agent.
+$distBranch = $branchAId;
+$before = \App\Services\AssignmentService::agentWorkload($distBranch);
+check('the branch has more than one active agent to spread across', count($before) >= 2,
+    'agents=' . count($before));
+
+$distCsv = $workDir . '/distribute.csv';
+$rows = ['Branch,Loan Account Number,Customer Name,Village,Outstanding Amount'];
+for ($i = 1; $i <= 8; $i++) {
+    $rows[] = sprintf('BR001,DIST%04d,Distributed Borrower %d,Kotri,%d', $i, $i, 10000 * $i);
+}
+file_put_contents($distCsv, implode("\n", $rows));
+
+$distResult = ImportService::run(
+    ['name' => 'distribute.csv', 'tmp_name' => $distCsv, 'error' => UPLOAD_ERR_OK, 'size' => filesize($distCsv)],
+    null, null, 1, 'System Administrator', [], false, null,
+    true // distribute
+);
+
+check('all eight rows imported', $distResult['inserted'] === 8, 'inserted=' . $distResult['inserted']);
+check('the import reports who got what', $distResult['distribution'] !== [],
+    json_encode($distResult['distribution']));
+
+$firstSpread = $distResult['distribution'];
+check('every agent in the branch received some',
+    count($firstSpread) === count($before),
+    'agents=' . count($before) . ' received=' . count($firstSpread));
+
+// The promise is about TOTAL open workload, not about the shares inside one file. Those
+// are different numbers whenever the agents did not start level, and the file shares are
+// the wrong thing to measure: an agent who already held four leads SHOULD receive fewer
+// from the next import. Balancing the totals is the whole reason this beats round-robin.
+$openAfter = array_map(
+    static fn (array $a): int => $a['open'],
+    \App\Services\AssignmentService::agentWorkload($distBranch)
+);
+check('open leads per agent are level after the import',
+    max($openAfter) - min($openAfter) <= 1, json_encode($openAfter));
+
+// Nothing was left unassigned, which is the failure mode where a "distribute" that
+// found no agent quietly imports the whole file to nobody.
+$unassignedAfter = (int) $db->scalar(
+    "SELECT COUNT(*) FROM loan_accounts WHERE loan_account_number LIKE 'DIST%' AND assigned_agent_id IS NULL"
+);
+check('no distributed lead was left unassigned', $unassignedAfter === 0, (string) $unassignedAfter);
+
+// The second file. This is the assertion the whole feature exists for.
+$distCsv2 = $workDir . '/distribute2.csv';
+$rows2 = ['Branch,Loan Account Number,Customer Name,Village,Outstanding Amount'];
+for ($i = 9; $i <= 16; $i++) {
+    $rows2[] = sprintf('BR001,DIST%04d,Distributed Borrower %d,Kotri,%d', $i, $i, 10000 * $i);
+}
+file_put_contents($distCsv2, implode("\n", $rows2));
+
+ImportService::run(
+    ['name' => 'distribute2.csv', 'tmp_name' => $distCsv2, 'error' => UPLOAD_ERR_OK, 'size' => filesize($distCsv2)],
+    null, null, 1, 'System Administrator', [], false, null,
+    true
+);
+
+$openAfterTwo = array_map(
+    static fn (array $a): int => $a['open'],
+    \App\Services\AssignmentService::agentWorkload($distBranch)
+);
+check('a second import continues the spread instead of restarting it',
+    max($openAfterTwo) - min($openAfterTwo) <= 1, json_encode($openAfterTwo));
+
+// Round-robin would have given the first agent in the branch every other lead across
+// both files. This is that failure expressed as a number.
+$distTotals = [];
+foreach ($db->all(
+    "SELECT assigned_agent_id, COUNT(*) AS n
+       FROM loan_accounts WHERE loan_account_number LIKE 'DIST%'
+      GROUP BY assigned_agent_id"
+) as $row) {
+    $distTotals[(int) $row['assigned_agent_id']] = (int) $row['n'];
+}
+check('no single agent took more than three quarters of the two files',
+    max($distTotals) <= 12, json_encode($distTotals));
+
+// An import that names one agent still does exactly that - the mode is a choice, not a
+// replacement, because assigning a specific village to a specific agent is a real need.
+$namedCsv = $workDir . '/named.csv';
+file_put_contents($namedCsv, implode("\n", [
+    'Branch,Loan Account Number,Customer Name,Village,Outstanding Amount',
+    'BR001,NAMED0001,Named Borrower,Kotri,50000',
+]));
+ImportService::run(
+    ['name' => 'named.csv', 'tmp_name' => $namedCsv, 'error' => UPLOAD_ERR_OK, 'size' => filesize($namedCsv)],
+    null, $agent1Id, 1, 'System Administrator'
+);
+check('naming a single agent still assigns the whole file to them',
+    (int) LoanAccount::findByNumber('NAMED0001')['assigned_agent_id'] === $agent1Id);
+
+// Distribution must never steal a lead somebody is already working.
+$workedLead = LoanAccount::findByNumber('DIST0001');
+$workedAgent = (int) $workedLead['assigned_agent_id'];
+$otherAgent = $workedAgent === $agent1Id ? $agent2Id : $agent1Id;
+\App\Services\AssignmentService::assign([(int) $workedLead['id']], $otherAgent, true);
+
+ImportService::run(
+    ['name' => 'distribute.csv', 'tmp_name' => $distCsv, 'error' => UPLOAD_ERR_OK, 'size' => filesize($distCsv)],
+    null, null, 1, 'System Administrator', [], false, null,
+    true
+);
+check('a re-import does not move a lead that is already assigned',
+    (int) LoanAccount::findByNumber('DIST0001')['assigned_agent_id'] === $otherAgent,
+    (string) LoanAccount::findByNumber('DIST0001')['assigned_agent_id']);
+
+// The panel's bulk action, on leads that are deliberately lopsided to begin with.
+$lopsided = array_map(
+    static fn (array $r): int => (int) $r['id'],
+    $db->all("SELECT id FROM loan_accounts WHERE loan_account_number LIKE 'DIST%' ORDER BY id")
+);
+$db->query(
+    'UPDATE loan_accounts SET assigned_agent_id = ? WHERE loan_account_number LIKE ?',
+    [$agent1Id, 'DIST%']
+);
+$piled = (int) $db->scalar(
+    'SELECT COUNT(*) FROM loan_accounts WHERE assigned_agent_id = ? AND loan_account_number LIKE ?',
+    [$agent1Id, 'DIST%']
+);
+check('the fixture really is lopsided to start with', $piled === count($lopsided), (string) $piled);
+
+$spreadResult = \App\Services\AssignmentService::distribute($lopsided);
+check('the bulk distribution reports what it moved', $spreadResult['updated'] > 0,
+    json_encode($spreadResult));
+
+$afterSpread = array_map(
+    static fn (array $a): int => $a['open'],
+    \App\Services\AssignmentService::agentWorkload($distBranch)
+);
+check('a lopsided branch is evened out',
+    count($afterSpread) >= 2 && max($afterSpread) - min($afterSpread) <= 1,
+    json_encode($afterSpread));
+check('and the result is reported per agent',
+    str_contains(implode(' ', $spreadResult['messages']), 'Open leads per agent'),
+    json_encode($spreadResult['messages']));
+
+// A closed lead is finished work and is not redistributed onto somebody's plate.
+$closedId = $lopsided[0];
+$db->update('loan_accounts', ['current_status' => 'closed'], ['id' => $closedId]);
+$closedOwner = (int) LoanAccount::find($closedId)['assigned_agent_id'];
+$closedRun = \App\Services\AssignmentService::distribute([$closedId]);
+check('a closed lead is skipped, not redistributed', $closedRun['updated'] === 0
+    && (int) LoanAccount::find($closedId)['assigned_agent_id'] === $closedOwner,
+    json_encode($closedRun));
+check('and the reason is stated',
+    str_contains(implode(' ', $closedRun['messages']), 'closed'),
+    json_encode($closedRun['messages']));
+
+// A branch with no active agent cannot receive a distribution, and says so rather than
+// silently importing to nobody.
+$emptyBranchId = Branch::create([
+    'branch_code' => 'BR900', 'name' => 'No Agents Branch', 'status' => 'active',
+]);
+$orphanCsv = $workDir . '/orphan.csv';
+file_put_contents($orphanCsv, implode("\n", [
+    'Branch,Loan Account Number,Customer Name,Outstanding Amount',
+    'BR900,ORPH0001,Orphan Borrower,1000',
+]));
+$orphanResult = ImportService::run(
+    ['name' => 'orphan.csv', 'tmp_name' => $orphanCsv, 'error' => UPLOAD_ERR_OK, 'size' => filesize($orphanCsv)],
+    null, null, 1, 'System Administrator', [], true, null,
+    true
+);
+check('a lead in an agentless branch still imports',
+    LoanAccount::findByNumber('ORPH0001') !== null);
+check('but is left unassigned rather than given to another branch\'s agent',
+    LoanAccount::findByNumber('ORPH0001')['assigned_agent_id'] === null);
+check('and the file says why',
+    str_contains(implode(' ', array_column($orphanResult['errors'], 'message')), 'no active BC agent'),
+    json_encode($orphanResult['errors']));
+
+// ---------------------------------------------------------------------------
+section('What an agent finds out at the door, and where it goes');
+
+// The edit form exists so a mistake can be fixed. It also has to be somewhere to ADD what
+// nobody knew when the file was built: a working phone number, the sanction figures off the
+// passbook the borrower is holding, and a note about what is actually going on.
+// Its own borrower and account, not one an earlier section has already edited. Reusing a
+// shared fixture is how the first version of this block failed: the lead it picked already
+// carried outstanding_amount as a hand-edit from another section, so "the figures nobody
+// touched still track the file" was asserted against a figure somebody had touched.
+$doorCustomerId = \App\Models\Customer::create([
+    'branch_id' => $branchAId,
+    'name'      => 'Doorstep Findings',
+    'village'   => 'Kotri',
+], '9800000001', null);
+$doorLeadId = LoanAccount::create([
+    'loan_account_number' => 'DOOR0001',
+    'customer_id'         => $doorCustomerId,
+    'branch_id'           => $branchAId,
+    'current_status'      => 'pending',
+    'outstanding_amount'  => 30000.00,
+    'overdue_amount'      => 5000.00,
+    'assigned_agent_id'   => $agent1Id,
+]);
+$doorLead = LoanAccount::find($doorLeadId);
+
+// The borrower's own number is dead and the son's answers. Recording the son's must not
+// destroy the number the bank was given at sanction - which is what happens when the only
+// field available is the one already filled in.
+$primaryBefore = \App\Models\Customer::findWithPii($doorCustomerId)['mobile'];
+\App\Models\Customer::update(
+    $doorCustomerId,
+    \App\Models\Customer::altMobileColumns('9812345678', 'Son'),
+);
+$withAlt = \App\Models\Customer::findWithPii($doorCustomerId);
+
+check('a second number can be recorded', $withAlt['alt_mobile'] === '9812345678');
+check('and it does not overwrite the number on record', $withAlt['mobile'] === $primaryBefore,
+    var_export($withAlt['mobile'], true));
+check('it says whose number it is', (string) $withAlt['alt_mobile_label'] === 'Son');
+check('it is masked for display like the first',
+    (string) $withAlt['alt_mobile_masked'] !== '' && !str_contains((string) $withAlt['alt_mobile_masked'], '9812'),
+    (string) $withAlt['alt_mobile_masked']);
+check('and it is encrypted at rest, not stored as digits',
+    !str_contains((string) $db->scalar('SELECT HEX(alt_mobile_enc) FROM customers WHERE id = ?', [$doorCustomerId]),
+        bin2hex('9812345678')));
+
+// Searchable, because somebody with a missed call is searching the number that called them.
+check('the borrower is findable by the second number',
+    (\App\Models\Customer::findByMobile('9812345678')['id'] ?? 0) === $doorCustomerId);
+check('and still by the first', (\App\Models\Customer::findByMobile((string) $primaryBefore)['id'] ?? 0) === $doorCustomerId);
+$altSearch = LoanAccount::paginate(['search' => '9812345678'], 'created_at', 'DESC', 1, 20);
+check('and the borrower list finds them by it too',
+    in_array($doorLeadId, array_map(static fn (array $r): int => (int) $r['id'], $altSearch->items), true),
+    'ids: ' . implode(',', array_map(static fn (array $r): int => (int) $r['id'], $altSearch->items)));
+
+// Clearing the number clears the label with it: "the son's number is on file" is worse
+// than nothing when no number is.
+\App\Models\Customer::update($doorCustomerId, \App\Models\Customer::altMobileColumns(null, 'Son'));
+$cleared = \App\Models\Customer::findWithPii($doorCustomerId);
+check('clearing the number clears its label', $cleared['alt_mobile'] === null && $cleared['alt_mobile_label'] === null);
+\App\Models\Customer::update($doorCustomerId, \App\Models\Customer::altMobileColumns('9812345678', 'Son'));
+
+// The five columns that were import-owned and unreachable. A passbook held out at a door
+// is only useful if there is somewhere to copy it to.
+foreach (['sanction_date', 'sanction_limit', 'drawing_power', 'interest_overdue', 'remarks'] as $column) {
+    check("{$column} can be edited by hand",
+        array_key_exists($column, LoanAccount::MANUALLY_EDITABLE));
+}
+
+$doorEdits = LoanAccount::applyManualEdit($doorLeadId, [
+    'sanction_limit'   => 150000.00,
+    'drawing_power'    => 120000.00,
+    'interest_overdue' => 4500.00,
+    'sanction_date'    => '2023-06-15',
+    'remarks'          => "Shifted to Delhi; brother works the land.\nWife says he returns after harvest.",
+], $agent1Id);
+check('all five are accepted in one edit', count($doorEdits) === 5, implode(',', array_keys($doorEdits)));
+
+$afterDoor = LoanAccount::find($doorLeadId);
+check('the sanction limit is stored', abs((float) $afterDoor['sanction_limit'] - 150000.0) < 0.01);
+check('the note is stored whole, newlines and all',
+    str_contains((string) $afterDoor['remarks'], 'brother works the land')
+    && str_contains((string) $afterDoor['remarks'], "\n"));
+check('and every one of them is stamped as hand-edited',
+    count(array_intersect(
+        ['sanction_limit', 'drawing_power', 'interest_overdue', 'sanction_date', 'remarks'],
+        LoanAccount::overriddenColumns($afterDoor['manual_overrides'] ?? null)
+    )) === 5,
+    implode(',', LoanAccount::overriddenColumns($afterDoor['manual_overrides'] ?? null)));
+
+// Which is the point: the file the branch sends tomorrow carries a remarks column of its
+// own, and it must not flatten what the agent found out.
+$doorCsv = $workDir . '/door.csv';
+file_put_contents($doorCsv, implode("\n", [
+    'Loan Account Number,Customer Name,Outstanding Amount,Remarks,Sanction Limit',
+    (string) $doorLead['loan_account_number'] . ',' . (string) $doorLead['customer_name'] . ',60000,Routine follow-up,999999',
+]));
+$doorImport = ImportService::run(
+    ['name' => 'door.csv', 'tmp_name' => $doorCsv, 'error' => UPLOAD_ERR_OK, 'size' => filesize($doorCsv)],
+    (int) $doorLead['branch_id'], null, 1, 'System Administrator', [], false, null, false
+);
+check('the import matched the account rather than creating another',
+    $doorImport['updated'] === 1 && $doorImport['inserted'] === 0,
+    json_encode($doorImport) . ' | acct=' . (string) $doorLead['loan_account_number']);
+$afterDoorImport = LoanAccount::find($doorLeadId);
+check('an import does not flatten the note the agent wrote',
+    str_contains((string) $afterDoorImport['remarks'], 'brother works the land'),
+    (string) $afterDoorImport['remarks']);
+check('nor the sanction limit they copied off the passbook',
+    abs((float) $afterDoorImport['sanction_limit'] - 150000.0) < 0.01,
+    (string) $afterDoorImport['sanction_limit']);
+check('while the figures nobody hand-edited still track the file',
+    abs((float) $afterDoorImport['outstanding_amount'] - 60000.0) < 0.01,
+    (string) $afterDoorImport['outstanding_amount']);
+
+// And no importer can touch the second number at all - not because of an override flag,
+// but because the export has no such column and nothing maps to it.
+check('the second number survives an import by construction',
+    \App\Models\Customer::findWithPii($doorCustomerId)['alt_mobile'] === '9812345678');
+
+// ---------------------------------------------------------------------------
+section('A lead typed in by hand, and what the next import does to it');
+
+// The panel can now create a borrower and a loan account without a spreadsheet, for the
+// accounts a branch hands an agent on paper before head office has them. What matters
+// here is the promise made on that form: the figures typed are a placeholder, and the
+// import that eventually carries the account replaces them.
+$handBranchId = (int) $branchAId;
+$handCustomerId = \App\Models\Customer::create([
+    'branch_id'           => $handBranchId,
+    'name'                => 'Typed Borrower',
+    'father_husband_name' => 'Typed Senior',
+    'village'             => 'Paper Village',
+], '9811100022', '432109876511');
+
+$handLoanId = LoanAccount::create([
+    'loan_account_number' => 'TYPED0001',
+    'customer_id'         => $handCustomerId,
+    'branch_id'           => $handBranchId,
+    'current_status'      => 'pending',
+    'outstanding_amount'  => 10000.00,
+    'overdue_amount'      => 2500.00,
+    'assigned_agent_id'   => $agent1Id,
+    'assigned_at'         => date('Y-m-d H:i:s'),
+    'assigned_by'         => 1,
+    'import_id'           => null,
+]);
+
+check('a loan account can be created with no import behind it', $handLoanId > 0);
+// Read straight from the table, not through LoanAccount::find(): import_id is not in the
+// model's projection, so `find(...)['import_id'] === null` is true because the key is
+// absent, which is a test that passes without ever looking at the column.
+check('and it carries no import id to a row that does not exist',
+    $db->scalar('SELECT import_id FROM loan_accounts WHERE id = ?', [$handLoanId]) === null);
+check('the borrower is encrypted like any other',
+    \App\Models\Customer::findWithPii($handCustomerId)['mobile'] === '9811100022');
+
+// The ENUM is the whole risk here: a value missing from visit_history.event_type throws
+// on insert, inside the same transaction as the thing it was recording.
+$handEventId = Timeline::record(
+    $handLoanId,
+    'lead_created',
+    'Lead created by hand',
+    'Typed into the panel, not imported from a bank export.',
+    1,
+    'System Administrator'
+);
+check('the timeline accepts a lead_created event', $handEventId > 0);
+check('and it is stored as its own event type, not as an import',
+    (string) $db->scalar('SELECT event_type FROM visit_history WHERE id = ?', [$handEventId]) === 'lead_created');
+
+// No overrides, deliberately. This is the assertion behind the sentence on the form.
+check('a hand-created lead is not stamped with manual overrides',
+    LoanAccount::find($handLoanId)['manual_overrides'] === null);
+
+$typedCsv = $workDir . '/typed.csv';
+file_put_contents($typedCsv, implode("\n", [
+    'Loan Account Number,Customer Name,Outstanding Amount,Overdue Amount',
+    'TYPED0001,Typed Borrower,77777,4321',
+]));
+$typedImport = ImportService::run(
+    ['name' => 'typed.csv', 'tmp_name' => $typedCsv, 'error' => UPLOAD_ERR_OK, 'size' => filesize($typedCsv)],
+    $handBranchId, null, 1, 'System Administrator', [], false, null, false
+);
+
+check('an import carrying the same account updates it rather than failing on the unique key',
+    $typedImport['updated'] === 1 && $typedImport['inserted'] === 0, json_encode($typedImport));
+$afterImport = LoanAccount::find($handLoanId);
+check('and the typed figures are replaced by the bank\'s',
+    abs((float) $afterImport['outstanding_amount'] - 77777.0) < 0.01,
+    (string) $afterImport['outstanding_amount']);
+check('the account is not duplicated',
+    (int) $db->scalar('SELECT COUNT(*) FROM loan_accounts WHERE loan_account_number = ?', ['TYPED0001']) === 1);
+check('nor is the borrower',
+    (int) $db->scalar('SELECT COUNT(*) FROM customers WHERE name = ?', ['Typed Borrower']) === 1);
+check('and the agent who created it keeps it',
+    (int) $afterImport['assigned_agent_id'] === $agent1Id);
+
+// The other half of the promise: a figure corrected AFTER creation is a human saying they
+// know better, and that one the import must leave alone.
+LoanAccount::applyManualEdit($handLoanId, ['overdue_amount' => 6000.00], 1);
+file_put_contents($typedCsv, implode("\n", [
+    'Loan Account Number,Customer Name,Outstanding Amount,Overdue Amount',
+    'TYPED0001,Typed Borrower,88888,1111',
+]));
+ImportService::run(
+    ['name' => 'typed.csv', 'tmp_name' => $typedCsv, 'error' => UPLOAD_ERR_OK, 'size' => filesize($typedCsv)],
+    $handBranchId, null, 1, 'System Administrator', [], false, null, false
+);
+$afterSecond = LoanAccount::find($handLoanId);
+check('a figure corrected after creation survives the next import',
+    abs((float) $afterSecond['overdue_amount'] - 6000.0) < 0.01,
+    (string) $afterSecond['overdue_amount']);
+check('while the figures nobody touched keep tracking the import',
+    abs((float) $afterSecond['outstanding_amount'] - 88888.0) < 0.01,
+    (string) $afterSecond['outstanding_amount']);
+
+// ---------------------------------------------------------------------------
+echo "\n" . str_repeat('=', 60) . "\n";
+printf("  INTEGRATION: %d passed, %d failed\n", $passed, $failed);
+if ($failures !== []) {
+    echo "  Failed: " . implode('; ', $failures) . "\n";
+}
+echo str_repeat('=', 60) . "\n";
+
+exit($failed === 0 ? 0 : 1);

@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+        Permissions are deliberately minimal.
+
+        This block used to say "There is NO location permission of any kind". That
+        stopped being true when duty-session location recording was added, so it has
+        been corrected rather than left to mislead whoever reads the manifest next.
+        See the location block below for what is and is not requested, and why.
+
+        There is still no payment capability - agents record field verification and
+        recovery follow-up only, they never collect money.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+
+    <!--
+        Location. This app DOES record where its agents are; earlier releases did
+        not, and the comment above this block used to say so. Nothing is collected
+        until the agent has acknowledged the written notice - the server returns 412
+        for every point until then - and the foreground service exists precisely so
+        that collection is impossible to run invisibly: Android shows a permanent
+        notification for as long as it is active.
+
+        ACCESS_BACKGROUND_LOCATION is deliberately NOT requested. A foreground
+        service with a visible notification covers a duty session, and asking for
+        background access would let the app collect with nothing on screen to say so.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
+    <!-- Gallery access: scoped storage on 33+, legacy read below that. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"
+        android:minSdkVersion="33" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!--
+        Needed to re-register the daily report reminder after a restart. Android drops
+        every alarm on reboot, silently, so without this the reminder works until the
+        agent's phone runs flat once and then never fires again - while the app still
+        shows it as on.
+
+        SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM are deliberately NOT requested. Google
+        restricts those to alarm clocks and calendar events; a deadline nudge is not
+        one, and an inexact alarm within a ten-minute window is entirely adequate for
+        it - and survives Doze, which an idle phone in a village will be in.
+    -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- A camera is preferred for capturing visit photos but not required. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
+    <!--
+        android:localeConfig declares English and Hindi, so Android 13+ lists this app
+        under Settings → System → Languages with its own per-app picker, and appcompat's
+        backport knows the same list on older phones. The app also carries its own
+        switcher on the Account tab: an agent who cannot read the phone's Settings in
+        English is exactly the person who needs to change the language.
+    -->
+    <application
+        android:name=".LrmsApp"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:localeConfig="@xml/locales_config"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.LRMS"
+        android:usesCleartextTraffic="false"
+        tools:targetApi="36">
+
+        <activity
+            android:name=".ui.splash.SplashActivity"
+            android:exported="true"
+            android:theme="@style/Theme.LRMS.Splash">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".ui.login.LoginActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.login.ChangePasswordActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.login.ForgotPasswordActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.main.MainActivity"
+            android:exported="false"
+            android:launchMode="singleTop" />
+
+        <activity
+            android:name=".ui.customer.CustomerProfileActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.main.MainActivity" />
+
+        <activity
+            android:name=".ui.visit.VisitReportActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.visit.VisitDetailActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.history.VisitHistoryActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.photo.PhotoUploadActivity"
+            android:exported="false" />
+
+        <!-- FileProvider for handing a camera capture target to the camera app. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+        <!--
+            Duty-session location recording. foregroundServiceType="location" is
+            required from API 34 and is also the declaration that makes Android show
+            the ongoing notification - which is the point, not a side effect.
+        -->
+        <service
+            android:name=".location.DutyLocationService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
+        <!--
+            The daily report reminder. Both receivers are unexported: nothing outside
+            this app has any reason to trigger an agent's reminder.
+        -->
+        <receiver
+            android:name=".reminder.ReportReminderReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".reminder.BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+
+        <activity
+            android:name=".ui.sss.SssEntryActivity"
+            android:exported="false"
+            android:label="@string/sss_title"
+            android:theme="@style/Theme.LRMS" />
+
+    </application>
+</manifest>

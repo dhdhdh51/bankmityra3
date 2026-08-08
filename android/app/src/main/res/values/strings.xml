@@ -1,0 +1,518 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">D2 Recovery Solutions &amp; Services</string>
+    <string name="app_full_name">Loan Recovery Management System</string>
+
+    <!-- ==================== Customer data sheet ==================== -->
+    <string name="customer_download_sheet">Download data sheet</string>
+    <string name="customer_sheet_preparing">Preparing the data sheet…</string>
+    <string name="customer_sheet_ready">Data sheet ready</string>
+    <string name="customer_sheet_open_with">Open the data sheet</string>
+    <string name="customer_sheet_no_viewer">No PDF app is installed to open the sheet. Install one and try again.</string>
+
+    <!-- ==================== Launch screen ==================== -->
+    <string name="splash_still_checking">Checking your session…</string>
+
+    <!-- ==================== Login ==================== -->
+    <string name="login_title">Sign in</string>
+    <string name="login_subtitle">Enter your employee code and password</string>
+    <string name="login_employee_code">Employee code</string>
+    <string name="login_password">Password</string>
+    <string name="login_remember">Keep me signed in</string>
+    <string name="login_button">Sign in</string>
+    <string name="login_forgot">Forgot password?</string>
+    <string name="login_server">Server address</string>
+    <string name="login_server_hint" translatable="false">https://your-domain.com/api/v1/</string>
+    <string name="login_change_server">Change server</string>
+    <string name="login_error_code">Enter your employee code</string>
+    <string name="login_error_password">Enter your password</string>
+    <string name="login_error_server">Enter a valid https:// server address</string>
+
+    <!-- ==================== Forgot / change password ==================== -->
+    <string name="forgot_title">Forgot password</string>
+    <string name="forgot_subtitle">We will send a one-time password to your registered mobile number</string>
+    <string name="forgot_send_otp">Send OTP</string>
+    <string name="forgot_otp">One-time password</string>
+    <string name="forgot_new_password">New password</string>
+    <string name="forgot_confirm_password">Confirm new password</string>
+    <string name="forgot_reset">Reset password</string>
+    <string name="change_password_title">Change password</string>
+    <string name="change_password_forced">Please set a new password before continuing.</string>
+    <string name="change_password_current">Current password</string>
+    <string name="change_password_update">Update password</string>
+    <string name="password_mismatch">The two passwords do not match</string>
+    <string name="password_too_short">Password must be at least 8 characters</string>
+
+    <!-- ==================== Navigation ==================== -->
+    <string name="nav_leads">My Leads</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_notifications">Alerts</string>
+    <string name="nav_account">Account</string>
+
+    <!-- ==================== Leads ==================== -->
+    <string name="leads_title">Assigned Leads</string>
+    <string name="leads_empty_title">No leads assigned</string>
+    <string name="leads_empty_message">Leads assigned to you by your branch will appear here. Pull down to refresh.</string>
+    <string name="leads_filter_all">All</string>
+    <string name="leads_filter_pending">Pending</string>
+    <string name="leads_filter_visited">Visited</string>
+    <string name="leads_filter_promise">Promise</string>
+    <string name="leads_filter_followup">Follow-up</string>
+    <string name="leads_filter_closed">Closed</string>
+    <!-- Facility filter: separates KCC and OD-2 into two lists, the same split the
+         KCC Renewal Worklist and OD-2 Renewal Worklist reports use on the web panel. -->
+    <string name="leads_filter_facility_all">All facilities</string>
+    <string name="leads_filter_facility_kcc">KCC</string>
+    <string name="leads_filter_facility_od2">OD-2</string>
+    <string name="leads_filter_facility_other">Other</string>
+    <string name="leads_empty_message_filtered">No leads match this filter. Try a different one.</string>
+
+    <!-- ==================== Search ==================== -->
+    <string name="search_title">Search Customer</string>
+    <string name="search_hint">Loan account no, name, mobile, Aadhaar or village</string>
+    <string name="search_empty_title">Search for a customer</string>
+    <string name="search_empty_message">Search by loan account number, customer name, mobile number, Aadhaar number or village.</string>
+    <string name="search_no_results_title">No matches</string>
+    <string name="search_no_results_message">Nothing matched that search. Check the spelling or try a different detail.</string>
+    <string name="search_scope_mine">My leads</string>
+    <string name="search_scope_branch">Whole branch</string>
+    <string name="search_too_short">Enter at least 2 characters</string>
+
+    <!-- ==================== Customer profile ==================== -->
+    <string name="profile_title">Customer Profile</string>
+    <string name="profile_borrower">Borrower details</string>
+    <string name="profile_loan">Loan details</string>
+    <string name="profile_promises">Promise history</string>
+    <string name="profile_visits">Visit history</string>
+    <string name="profile_photos">Photos</string>
+    <string name="profile_timeline">Timeline</string>
+    <string name="profile_new_visit">Submit visit report</string>
+    <string name="profile_call">Call</string>
+    <string name="profile_view_history">View full history</string>
+    <string name="profile_no_promises">No promises recorded.</string>
+    <string name="profile_no_visits">No visits recorded yet.</string>
+    <string name="profile_other_accounts">Other accounts</string>
+
+    <!-- Every fixed field beyond the summary card, plus any custom field an
+         import or the panel added - shown together so an agent sees everything
+         known about the account, and can correct any of it. -->
+    <string name="profile_additional_details">Additional details</string>
+    <string name="profile_edit">Edit</string>
+    <string name="profile_edit_done">Done</string>
+    <string name="profile_field_saved">Saved.</string>
+    <string name="profile_field_save_failed">Could not save %1$s.</string>
+    <string name="profile_field_hand_corrected">Hand-corrected</string>
+    <string name="profile_no_additional_details">Nothing more is recorded for this account.</string>
+
+    <!-- Field labels -->
+    <string name="label_customer_name">Customer name</string>
+    <string name="label_father_husband">Father / husband name</string>
+    <string name="label_mobile">Mobile</string>
+    <string name="label_aadhaar">Aadhaar</string>
+    <string name="label_village">Village</string>
+    <string name="label_address">Address</string>
+    <string name="label_loan_account">Loan account number</string>
+    <string name="label_loan_type">Loan type</string>
+    <string name="label_outstanding">Outstanding</string>
+    <string name="label_overdue">Overdue</string>
+    <string name="label_npa_date">NPA date</string>
+    <string name="label_status">Status</string>
+    <string name="label_branch">Branch</string>
+    <string name="label_bc_code">BC code</string>
+    <string name="label_visits">Visits</string>
+    <string name="label_agent">Agent</string>
+
+    <!-- ==================== Visit report ==================== -->
+    <string name="visit_title">Field Visit Report</string>
+    <string name="visit_section_general">General</string>
+    <string name="visit_section_borrower">Borrower details</string>
+    <string name="visit_section_loan">Loan details</string>
+    <string name="visit_section_contact">Customer contact</string>
+    <string name="visit_section_verification">Physical verification</string>
+    <string name="visit_section_recovery">Recovery possibility</string>
+    <string name="visit_section_reason">Non-payment reason</string>
+    <string name="visit_section_recommendation">Agent recommendation</string>
+    <string name="visit_section_remarks">Remarks</string>
+    <string name="visit_section_documents">Documents</string>
+
+    <string name="visit_date">Visit date</string>
+    <string name="visit_time">Visit time</string>
+
+    <string name="visit_customer_met">Customer met</string>
+    <string name="visit_family_met">Family member met</string>
+    <string name="visit_house_locked">House locked</string>
+    <string name="visit_phone_contact">Phone contact</string>
+    <string name="visit_phone_off">Phone switched off</string>
+    <string name="visit_family_name">Family member name</string>
+    <string name="visit_family_relationship">Relationship</string>
+
+    <string name="visit_borrower_alive">Borrower alive</string>
+    <string name="visit_same_address">Same address</string>
+    <string name="visit_shifted">Shifted</string>
+    <string name="visit_occupation">Occupation</string>
+    <string name="visit_occupation_other">Specify occupation</string>
+
+    <string name="visit_ready_to_pay">Ready to pay</string>
+    <string name="visit_not_ready">Not ready</string>
+    <string name="visit_interest_payment">Interest payment</string>
+    <string name="visit_ots" translatable="false">OTS</string>
+    <string name="visit_promise_amount">Promise amount</string>
+    <string name="visit_promise_date">Promise date</string>
+    <string name="visit_promise_incomplete">A promise needs both an amount and a date</string>
+
+    <string name="visit_reason_financial">Financial problem</string>
+    <string name="visit_reason_crop">Crop loss</string>
+    <string name="visit_reason_animal">Animal loss</string>
+    <string name="visit_reason_illness">Illness</string>
+    <string name="visit_reason_unemployment">Unemployment</string>
+    <string name="visit_reason_dispute">Dispute</string>
+    <string name="visit_reason_other_loan">Other loan</string>
+    <string name="visit_reason_others">Others</string>
+    <string name="visit_reason_other_text">Specify reason</string>
+
+    <string name="visit_rec_recovery_possible">Recovery possible</string>
+    <string name="visit_rec_followup">Regular follow-up</string>
+    <string name="visit_rec_legal">Legal action</string>
+    <string name="visit_rec_rc" translatable="false">RC</string>
+    <string name="visit_rec_ots" translatable="false">OTS</string>
+    <string name="visit_rec_others">Others</string>
+    <string name="visit_rec_other_text">Specify recommendation</string>
+
+    <string name="visit_remarks_hint">Observations, next steps, anything the branch should know</string>
+
+    <string name="visit_customer_photo">Customer photo</string>
+    <string name="visit_house_photo">House photo</string>
+    <string name="visit_aadhaar_photo">Aadhaar copy</string>
+    <string name="visit_agent_photo">Your photo at this visit</string>
+    <string name="visit_agent_photo_hint">Camera only — records that you were here</string>
+    <string name="visit_other_documents">Other documents</string>
+
+    <!--
+      Nothing here captures a signature any more. The printed report carries empty
+      ruled boxes and the paper is signed by hand, so the pad, its buttons and the
+      "Captured / Not captured" states are gone. This one string survives because the
+      photo screen borrowed it for "no other documents attached", which is a different
+      sentence that happened to read the same.
+    -->
+    <string name="visit_none_attached">Not attached</string>
+
+    <string name="visit_submit">Submit visit report</string>
+    <string name="visit_submitting">Submitting…</string>
+    <string name="visit_submitted">Visit report submitted</string>
+    <string name="visit_discard_title">Discard this report?</string>
+    <string name="visit_discard_message">The details you have entered will be lost.</string>
+    <string name="visit_discard_confirm">Discard</string>
+    <string name="visit_keep_editing">Keep editing</string>
+    <string name="visit_error_contact">Select how the visit went</string>
+
+    <!-- ==================== Photos ==================== -->
+    <string name="photo_title">Photo Upload</string>
+    <string name="photo_take">Take photo</string>
+    <string name="photo_choose">Choose from gallery</string>
+    <string name="photo_remove">Remove</string>
+    <string name="photo_camera_denied">Camera permission is needed to take a photo.</string>
+    <string name="photo_agent_camera_only">Your own photo must be taken with the camera so it records where you are.</string>
+    <string name="photo_gallery_denied">Storage permission is needed to pick a photo.</string>
+
+    <!-- ==================== Visit history ==================== -->
+    <string name="history_title">Visit History</string>
+    <string name="history_empty_title">No visits yet</string>
+    <string name="history_empty_message">Submitted field visit reports appear here, newest first.</string>
+    <string name="history_read_only">This history is read-only. Reports are never edited once submitted.</string>
+
+    <!-- ==================== Notifications ==================== -->
+    <string name="notifications_title">Notifications</string>
+    <string name="notifications_empty_title">No notifications</string>
+    <string name="notifications_empty_message">New lead assignments, follow-up reminders and promise reminders appear here.</string>
+    <string name="notifications_mark_all">Mark all read</string>
+
+    <!-- ==================== Account ==================== -->
+    <string name="account_title">Account</string>
+    <string name="account_change_password">Change password</string>
+    <string name="account_dark_mode">Dark mode</string>
+    <string name="account_sign_out">Sign out</string>
+    <string name="account_sign_out_confirm">Sign out of D2 Recovery Solutions &amp; Services?</string>
+    <string name="account_about">About</string>
+    <string name="account_my_stats">My performance</string>
+    <string name="account_assigned">Assigned</string>
+    <string name="account_visits_today">Visits today</string>
+    <string name="account_visits_month">Visits this month</string>
+    <string name="account_promises_kept">Promises kept</string>
+
+    <!-- ==================== Common ==================== -->
+    <string name="action_retry">Retry</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_ok">OK</string>
+    <string name="action_save">Save</string>
+    <string name="action_close">Close</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="loading">Loading…</string>
+    <string name="error_network">No internet connection. Check your network and try again.</string>
+    <string name="error_timeout">The server took too long to respond. Please try again.</string>
+    <string name="error_server">Something went wrong on the server. Please try again.</string>
+    <string name="error_session_expired">Your session has expired. Please sign in again.</string>
+    <string name="error_unknown">Something went wrong. Please try again.</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="not_stated">Not stated</string>
+    <string name="not_available" translatable="false">—</string>
+    <string name="npa_badge" translatable="false">NPA</string>
+    <string name="required_marker" translatable="false">*</string>
+    <string name="update_required_title">Update required</string>
+    <string name="update_required_message">This version of D2 Recovery Solutions &amp; Services is no longer supported. Please install the latest version to continue.</string>
+
+    <string name="account_version_format">Version %1$s (build %2$d)</string>
+    <string name="visit_submitted_from">Submitted from %1$s v%2$s on %3$s. This record is append-only and has not been edited.</string>
+    <string name="account_pending">Pending</string>
+    <string name="account_promises_pending">Promises pending</string>
+    <string name="account_outstanding">Outstanding</string>
+    <string name="account_overdue">Overdue</string>
+    <!--
+        This used to read "It does not track your location." That stopped being
+        true when location recording was added, so it was replaced rather than
+        left to quietly mislead the person reading it.
+    -->
+    <string name="account_sss">Today\'s SSS enrolment</string>
+
+    <!-- The daily report alarm -->
+    <string name="report_reminder_title">Submit your daily report</string>
+    <string name="report_reminder_body">Due by %1$s today.</string>
+    <string name="report_reminder_body_long">Your daily report is due by %1$s today. Tap to enter today\'s enrolment figures — your visits are already counted.</string>
+    <string name="report_reminder_channel_name">Daily report reminder</string>
+    <string name="report_reminder_channel_description">A nudge at your report deadline, repeating until you have filed. Never fires on a Sunday, stops as soon as your report is in, and goes quiet for the night.</string>
+
+    <!-- SSS enrolment, entered by the agent -->
+    <string name="sss_title">SSS enrolment</string>
+    <string name="sss_for_date">For %1$s</string>
+    <string name="sss_read_only">This day can no longer be changed here. Ask your supervisor to correct it.</string>
+    <string name="sss_counted_heading">Counted for you today</string>
+    <string name="sss_counted_note">Taken from the visit reports you have filed. You never type these.</string>
+    <string name="sss_counted_visits">Visits</string>
+    <string name="sss_counted_contacts">Met</string>
+    <string name="sss_counted_ptp" translatable="false">PTP</string>
+    <string name="sss_entry_heading">Enrolments you did today</string>
+    <string name="sss_apy" translatable="false">APY</string>
+    <string name="sss_apy_full">Atal Pension Yojana</string>
+    <string name="sss_pmjjby" translatable="false">PMJJBY</string>
+    <string name="sss_pmjjby_full">Pradhan Mantri Jeevan Jyoti Bima Yojana</string>
+    <string name="sss_pmsby" translatable="false">PMSBY</string>
+    <string name="sss_pmsby_full">Pradhan Mantri Suraksha Bima Yojana</string>
+    <string name="sss_pmjdy" translatable="false">PMJDY</string>
+    <string name="sss_pmjdy_full">Pradhan Mantri Jan Dhan Yojana</string>
+    <string name="sss_remarks">Remarks (optional)</string>
+    <string name="sss_save">Save today\'s enrolment</string>
+    <string name="sss_saved">Saved — %1$d enrolment(s) today.</string>
+    <string name="sss_month_total">This month: %1$d enrolment(s) over %2$d day(s)</string>
+    <!--
+      What the agent is told about location, and all of it. There is no acknowledgement
+      to give and no switch to set: granting the permission is the whole of the consent,
+      so the wording states plainly what happens and does not invite a tap that leads
+      nowhere. The strings for the old notice screen, its accept and withdraw actions
+      and the duty toggle are gone with the screen.
+    -->
+    <string name="location_notice_short">This app records your location while you are signed in, and when you take a visit photo.</string>
+    <string name="location_on_duty">On duty — location is being recorded</string>
+    <string name="location_stop_duty">Stop</string>
+    <string name="location_channel_name">Duty session</string>
+    <string name="location_channel_description">Shown while your location is being recorded, so you can always tell that it is on.</string>
+
+    <!-- Content descriptions -->
+    <string name="cd_call">Call customer</string>
+    <string name="cd_photo">Photo</string>
+    <string name="cd_back">Back</string>
+    <string name="cd_notification_icon">Notification type</string>
+    <string name="cd_avatar">Profile initial</string>
+
+    <!-- ===================================================================
+         Report type
+         =================================================================== -->
+    <string name="visit_report_type">Report type</string>
+    <string name="visit_report_type_helper">Choose the form that matches this visit</string>
+    <string name="report_type_recovery">Recovery Visit</string>
+    <string name="report_type_ots">KRM / OTS Settlement</string>
+    <string name="report_type_ckcc">CKCC OD-2 Renewal</string>
+    <string name="visit_ckcc_suggested">This is a CKCC account - the renewal form may be the one you want</string>
+
+    <string name="rupee" translatable="false">\u20B9</string>
+
+    <!-- ===================================================================
+         KRM / OTS settlement
+         =================================================================== -->
+    <string name="ots_section_title">KRM / OTS SETTLEMENT</string>
+    <string name="ots_scheme_none">No scheme</string>
+    <string name="ots_eligible">Eligible for KRM / OTS</string>
+    <string name="ots_scheme">Applicable scheme</string>
+    <string name="ots_group_settlement">Settlement amounts</string>
+    <string name="ots_relief_percent">Relief / waiver</string>
+    <string name="ots_rlb_amount">Residual loan balance (RLB)</string>
+    <string name="ots_rlb_helper">The figure the branch gave you</string>
+    <string name="ots_payable_percent">Payable</string>
+    <string name="ots_payable_amount">Borrower\'s payable amount</string>
+    <string name="ots_total_settlement">Total OTS settlement amount</string>
+    <string name="ots_group_deposit">Initial deposit</string>
+    <string name="ots_deposit_notice">Record a deposit the borrower made at the bank. Never collect money yourself — enter the bank\'s receipt or transaction number as proof.</string>
+    <string name="ots_deposit_percent">Deposit</string>
+    <string name="ots_required_deposit">Required initial deposit</string>
+    <string name="ots_deposit_received">Initial deposit received</string>
+    <string name="ots_deposit_amount">Deposit amount</string>
+    <string name="ots_deposit_date">Deposit date</string>
+    <string name="ots_deposit_reference">Receipt no. / transaction ID</string>
+    <string name="ots_deposit_reference_helper">From the bank\'s receipt</string>
+    <string name="ots_balance_payable">Balance amount payable</string>
+    <string name="ots_final_payment_date">Proposed final payment date</string>
+    <string name="ots_group_approval">Approval and validity</string>
+    <string name="ots_approval_status">OTS approval status</string>
+    <string name="ots_validity_from">Validity from</string>
+    <string name="ots_validity_to">Validity to</string>
+    <string name="ots_expected_closure">Expected account closure date</string>
+    <string name="ots_borrower_accepted">Borrower accepted the OTS terms</string>
+    <string name="ots_rejection_reason">If not accepted, reason</string>
+    <string name="suggestion_tap_to_use">Suggested: %1$s — tap to use</string>
+
+    <!-- ===================================================================
+         CKCC OD-2 renewal
+         =================================================================== -->
+    <string name="ckcc_section_title">CKCC OD-2 RENEWAL</string>
+    <string name="ckcc_group_account">Account details</string>
+    <string name="ckcc_cif">CIF number</string>
+    <string name="ckcc_sanction_date">Sanction date</string>
+    <string name="ckcc_sanction_limit">Sanction limit</string>
+    <string name="ckcc_drawing_power">Drawing power</string>
+    <string name="ckcc_outstanding">Outstanding amount</string>
+    <string name="ckcc_interest_overdue">Interest overdue</string>
+    <string name="ckcc_renewal_due">Renewal due date</string>
+    <string name="ckcc_renewal_due_helper">Required — the NPA date is worked out from this</string>
+    <string name="ckcc_npa_warning">If the renewal is not completed, this account is expected to turn NPA on %1$s.</string>
+    <string name="ckcc_days_remaining">%1$d days left to renew</string>
+    <string name="ckcc_days_overdue">Renewal overdue by %1$d days</string>
+    <string name="ckcc_due_today">Renewal is due today</string>
+    <string name="ckcc_group_eligibility">Renewal eligibility</string>
+    <string name="ckcc_eligible">Eligible for CKCC renewal</string>
+    <string name="ckcc_kyc_complete">KYC complete</string>
+    <string name="ckcc_aadhaar_seeded">Aadhaar seeded</string>
+    <string name="ckcc_mobile_linked">Mobile linked</string>
+    <string name="ckcc_aadhaar_auth">Aadhaar authentication completed</string>
+    <string name="ckcc_group_consent">Renewal consent</string>
+    <string name="ckcc_willing">Borrower willing to renew CKCC</string>
+    <string name="ckcc_documents_handed">Documents handed over</string>
+    <string name="ckcc_form_signed">Renewal form signed</string>
+    <string name="ckcc_ekyc">Aadhaar e-KYC completed</string>
+    <string name="ckcc_biometrics">Biometrics completed</string>
+    <string name="ckcc_group_observation">BC agent observation</string>
+    <string name="ckcc_observation">What you saw and were told</string>
+    <string name="ckcc_group_recommendation">BC agent recommendation</string>
+    <string name="ckcc_rec_renew_now">Renewal should be processed immediately</string>
+    <string name="ckcc_rec_docs_submitted">Documents complete</string>
+    <string name="ckcc_rec_pending_documents">Documents still pending</string>
+    <string name="ckcc_rec_followup">Follow-up required</string>
+    <string name="ckcc_rec_not_interested">Customer not interested in renewal</string>
+    <string name="ckcc_rec_branch_urgent">Branch should contact customer urgently</string>
+    <string name="ckcc_rec_other">Other recommendation</string>
+    <string name="ckcc_rec_other_text">Which other recommendation</string>
+    <string name="ckcc_group_status">Report status</string>
+    <string name="ckcc_st_contacted">Customer contacted</string>
+    <string name="ckcc_st_verified">Customer verified</string>
+    <string name="ckcc_st_docs_collected">Renewal documents collected</string>
+    <string name="ckcc_st_submitted">Renewal application submitted</string>
+    <string name="ckcc_st_renewed">CKCC renewed</string>
+    <string name="ckcc_st_pending_branch">Pending at branch</string>
+    <string name="ckcc_st_followup">Follow-up required</string>
+    <string name="ckcc_st_npa">Account became NPA</string>
+
+    <string name="ckcc_bucket_overdue">Overdue</string>
+    <string name="ckcc_bucket_7">Within 7 Days</string>
+    <string name="ckcc_bucket_15">Within 15 Days</string>
+    <string name="ckcc_bucket_30">Within 30 Days</string>
+
+    <!-- Declaration -->
+    <string name="visit_sp_cbc_name">SP / CBC name</string>
+
+    <!-- ===== The printed form's own sections =====
+         Wording follows the D2 Recovery Solutions &amp; Services "Field Visit Verification Report" so an agent
+         holding the paper form finds the same words on the screen. -->
+    <string name="visit_section_documents_verified">7. Documents verified</string>
+    <string name="visit_section_documents_verified_helper">What the borrower actually produced, whether or not you photographed it</string>
+    <string name="visit_doc_aadhaar">Aadhaar card</string>
+    <string name="visit_doc_pan">PAN card</string>
+    <string name="visit_doc_passbook">Passbook</string>
+    <string name="visit_doc_land_record">Land record</string>
+    <string name="visit_doc_khatauni">Khatauni</string>
+    <string name="visit_doc_electricity_bill">Electricity bill</string>
+    <string name="visit_doc_photograph">Photograph</string>
+    <string name="visit_doc_mobile_verified">Mobile verified</string>
+    <string name="visit_doc_renewal_form">Renewal form</string>
+    <string name="visit_doc_ots_consent">OTS consent letter</string>
+    <string name="visit_doc_others">Other document</string>
+    <string name="visit_doc_other_text">Which other document</string>
+
+    <string name="visit_section_evidence">10. Evidence attached</string>
+    <string name="visit_section_evidence_helper">Tick what this report carries. The panel shows this next to what actually arrived.</string>
+    <string name="visit_ev_borrower_photo">Borrower photograph</string>
+    <string name="visit_ev_house_photo">House photograph</string>
+    <string name="visit_ev_land_photo">Land photograph</string>
+    <string name="visit_ev_aadhaar_copy">Aadhaar copy</string>
+    <string name="visit_ev_passbook_copy">Passbook copy</string>
+    <string name="visit_ev_gps_location">GPS location</string>
+    <string name="visit_ev_renewal_form">Renewal form</string>
+    <string name="visit_ev_ots_consent">OTS consent</string>
+    <string name="visit_ev_others">Other evidence</string>
+    <string name="visit_ev_other_text">Which other evidence</string>
+
+    <string name="visit_section_declaration">11. Declaration</string>
+    <string name="visit_declaration_accept">I certify this report is accurate and was collected during my own field visit</string>
+    <string name="visit_declaration_required">Tick the declaration before submitting</string>
+    <string name="visit_declaration_full">The full declaration — RBI guidelines, the Bank\'s policies, the Fair Practices Code and the Code of Conduct for field verification — is printed in full on every copy of this report.</string>
+
+    <string name="visit_gender">Gender</string>
+    <string name="visit_date_of_birth">Date of birth</string>
+    <string name="visit_pan">PAN number</string>
+    <string name="visit_pan_helper">Optional. 10 characters, e.g. ABCDE1234F</string>
+    <string name="visit_pan_invalid">A PAN is five letters, four digits and one letter</string>
+    <string name="visit_group_address">Address</string>
+    <string name="visit_addr_village">Village</string>
+    <string name="visit_gram_panchayat">Gram panchayat</string>
+    <string name="visit_tehsil">Tehsil</string>
+    <string name="visit_addr_district">District</string>
+    <string name="visit_state">State</string>
+    <string name="visit_pin_code">PIN code</string>
+    <string name="visit_pin_invalid">A PIN code is six digits</string>
+
+    <string name="visit_cif_number">CIF number</string>
+    <string name="visit_loan_type">Loan type</string>
+    <string name="visit_loan_type_other">Which other loan type</string>
+    <string name="visit_sanction_date">Sanction date</string>
+    <string name="visit_sanction_limit">Sanction limit</string>
+    <string name="visit_drawing_power">Drawing power</string>
+    <string name="visit_interest_overdue">Interest overdue</string>
+    <string name="visit_asset_classification">Asset classification</string>
+
+    <string name="visit_residence_verified">Residence verification</string>
+    <string name="visit_neighbour_verification">Neighbour verification</string>
+    <string name="visit_general_recommendation">General recommendation</string>
+
+    <string name="ots_scheme_other_text">Which other scheme</string>
+    <string name="ots_customer_response">Customer response</string>
+    <string name="ots_customer_response_helper">Why, not just whether. Asking for time and refusing outright lead to different next steps.</string>
+    <string name="ots_expected_deposit_date">Expected deposit date</string>
+    <string name="ots_group_recommendation">Recommendation on the settlement</string>
+    <string name="ots_rec_proposal_recommended">OTS proposal recommended</string>
+    <string name="ots_rec_followup_required">Follow-up required</string>
+    <string name="ots_rec_customer_refused">Customer refused</string>
+    <string name="ots_rec_not_eligible">Not eligible</string>
+    <string name="ots_group_status">Final report status</string>
+    <string name="ots_st_customer_contacted">Customer contacted</string>
+    <string name="ots_st_customer_verified">Customer verified</string>
+    <string name="ots_st_ots_accepted">OTS accepted</string>
+    <string name="ots_st_ots_rejected">OTS rejected</string>
+    <string name="ots_st_initial_deposit_received">Initial deposit received</string>
+    <string name="ots_st_ots_closed">OTS closed</string>
+    <string name="ots_st_followup_required">Follow-up required</string>
+
+    <!-- The language switcher. English and Hindi ship as full translations; the third
+         choice follows whatever the phone is set to. -->
+    <string name="account_language">Language</string>
+    <string name="account_language_english">English</string>
+    <string name="account_language_hindi">हिन्दी</string>
+    <string name="account_language_system">Phone\'s language</string>
+    <string name="account_language_hint">The app\'s language. The report form keeps the wording that is printed on the paper copy.</string>
+</resources>
