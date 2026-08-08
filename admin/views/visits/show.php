@@ -409,8 +409,9 @@ $revisionCount = (int) ($report['revision_count'] ?? 0);
         </div>
 
         <!-- ================= KRM / OTS settlement =================
-             Only rendered when the agent filed this section. -->
-        <?php if ($ots !== null): ?>
+             Only rendered when the agent filed this section and the report
+             is NOT a CKCC OD-2 renewal (those must not show OTS content). -->
+        <?php if ($ots !== null && ($report['report_type'] ?? '') !== 'ckcc_renewal'): ?>
             <div class="lrms-card lrms-card-accent mb-3">
                 <div class="lrms-card-head">
                     <h2>4. KRM OTS details</h2>
