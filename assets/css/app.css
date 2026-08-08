@@ -1495,3 +1495,376 @@ a.lrms-stat:active { transform: translateY(0); }
    .navbar-collapse: neither is used here, and a blanket rule for them would be a
    trap for whoever adds the first one. */
 .tab-content > .tab-pane:not(.active) { display: none; }
+
+/* ==========================================================================
+   Responsive container and layout improvements (FEAT-003)
+   ==========================================================================
+   Adds proper container width constraints for desktop and mobile, ensures
+   tables scroll on small screens, fixes sticky header overlap, adds enhanced
+   print styles for A4 output, and provides responsive form improvements.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Desktop container constraint
+   --------------------------------------------------------------------------
+   Prevents the content area from stretching to full width on large monitors.
+   Centered with auto margins so it reads naturally.
+   -------------------------------------------------------------------------- */
+@media (min-width: 992px) {
+    .lrms-content {
+        max-width: 1200px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   Sticky header content offset
+   --------------------------------------------------------------------------
+   The .lrms-topbar is position: sticky. On some browsers and layouts the
+   content beneath it can be overlapped. This padding ensures the first
+   element in .lrms-content is never hidden behind the topbar.
+   -------------------------------------------------------------------------- */
+.lrms-content {
+    padding-top: calc(var(--lrms-topbar-h, 60px) + 20px);
+}
+@media (min-width: 1400px) {
+    .lrms-content { padding-top: calc(var(--lrms-topbar-h, 60px) + 24px); }
+}
+@media (max-width: 991.98px) {
+    .lrms-content { padding-top: calc(var(--lrms-topbar-h, 60px) + 16px); }
+}
+
+/* --------------------------------------------------------------------------
+   Mobile container constraint
+   --------------------------------------------------------------------------
+   On small mobile screens (< 576px), cards and form containers should not
+   exceed 420px to prevent overlay/overlap issues. This applies to the main
+   content wrapper and to individual cards when viewed on phones.
+   -------------------------------------------------------------------------- */
+@media (max-width: 575.98px) {
+    .lrms-content {
+        max-width: 420px;
+        margin-left: auto;
+        margin-right: auto;
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+
+    .lrms-card {
+        max-width: 420px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   Table horizontal scroll on mobile
+   --------------------------------------------------------------------------
+   .lrms-table-wrap already has overflow-x: auto in the base system. This
+   reinforces it on small screens and adds visual cues (gradient fade) and
+   ensures the table does not break layout on narrow viewports.
+   -------------------------------------------------------------------------- */
+@media (max-width: 767.98px) {
+    .lrms-table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin-left: -12px;
+        margin-right: -12px;
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+
+    .lrms-table {
+        min-width: 600px;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   Card body consistent padding
+   -------------------------------------------------------------------------- */
+@media (max-width: 575.98px) {
+    .lrms-card-body { padding: 12px; }
+}
+@media (min-width: 576px) and (max-width: 991.98px) {
+    .lrms-card-body { padding: 14px; }
+}
+@media (min-width: 992px) {
+    .lrms-card-body { padding: 18px; }
+}
+
+/* --------------------------------------------------------------------------
+   Responsive form improvements
+   --------------------------------------------------------------------------
+   Mobile (< 576px): full-width single-column inputs.
+   Tablet (576px - 767px): two-column layout for forms.
+   Desktop (>= 768px): existing multi-column layout untouched.
+   -------------------------------------------------------------------------- */
+@media (max-width: 575.98px) {
+    .lrms-fieldset .row > [class*="col-"] {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+
+    .lrms-filters {
+        grid-template-columns: 1fr;
+    }
+
+    .lrms-check-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .form-control, .form-select {
+        font-size: 1rem;
+        padding: .55rem .75rem;
+    }
+
+    .btn {
+        width: 100%;
+        justify-content: center;
+        padding: .6rem 1rem;
+    }
+
+    .lrms-page-head {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .lrms-page-head .btn,
+    .lrms-page-head .d-flex {
+        width: 100%;
+    }
+}
+
+@media (min-width: 576px) and (max-width: 767.98px) {
+    .lrms-fieldset .row > [class*="col-md"],
+    .lrms-fieldset .row > [class*="col-lg"] {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+
+    .lrms-filters {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .lrms-check-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* --------------------------------------------------------------------------
+   Stats grid mobile adjustments
+   -------------------------------------------------------------------------- */
+@media (max-width: 575.98px) {
+    .lrms-stats {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+}
+
+@media (min-width: 576px) and (max-width: 767.98px) {
+    .lrms-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* --------------------------------------------------------------------------
+   Bottom navigation safe area (if present)
+   -------------------------------------------------------------------------- */
+@media (max-width: 991.98px) {
+    .lrms-content {
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+    }
+}
+
+/* ==========================================================================
+   Enhanced Print Styles (A4 Optimization)
+   ==========================================================================
+   Comprehensive print rules that complement the existing @media print block
+   above. Ensures A4-perfect output with no clipping, no overlapping, and
+   proper margins. This overrides/enhances the base print rules.
+   ========================================================================== */
+
+@media print {
+    @page {
+        size: A4;
+        margin: 12mm 10mm;
+    }
+
+    html, body {
+        width: 210mm;
+        margin: 0;
+        padding: 0;
+    }
+
+    body {
+        font-size: 9pt !important;
+        line-height: 1.4 !important;
+        background: #fff !important;
+        color: #000 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    /* Hide non-print elements */
+    .lrms-sidebar,
+    .lrms-topbar,
+    .lrms-bulkbar,
+    .no-print,
+    .lrms-filters,
+    .pagination,
+    .lrms-pager,
+    .btn:not(.print-keep),
+    .lrms-sidebar-backdrop,
+    .dropdown-menu {
+        display: none !important;
+    }
+
+    /* Reset layout for print */
+    .lrms-shell { display: block; }
+    .lrms-main {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+    .lrms-content {
+        padding: 0 !important;
+        max-width: none !important;
+        margin: 0 !important;
+    }
+
+    /* Cards: avoid page breaks inside */
+    .lrms-card {
+        break-inside: avoid;
+        page-break-inside: avoid;
+        border: 1px solid #ddd !important;
+        box-shadow: none !important;
+        margin-bottom: 8pt;
+    }
+
+    .lrms-card-head {
+        background: #f8f9fa !important;
+    }
+
+    /* Tables: reduced font size for fitting A4 width */
+    .lrms-table {
+        font-size: 8pt !important;
+    }
+
+    .lrms-table thead th {
+        font-size: 7pt !important;
+        background: #eef2f8 !important;
+        color: #071d40 !important;
+        padding: 5px 8px !important;
+        box-shadow: none !important;
+    }
+
+    .lrms-table tbody td {
+        padding: 4px 8px !important;
+        font-size: 8pt !important;
+    }
+
+    .lrms-table-wrap {
+        overflow: visible !important;
+    }
+
+    /* Disable backgrounds except badges */
+    .lrms-stat,
+    .lrms-stat-accent,
+    .lrms-card-foot {
+        background: #fff !important;
+        box-shadow: none !important;
+    }
+
+    /* Badges keep their backgrounds for identification */
+    .lrms-badge,
+    .badge-pending,
+    .badge-visited,
+    .badge-promise,
+    .badge-followup,
+    .badge-legal,
+    .badge-closed {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    /* Stat grid: 4 columns on print */
+    .lrms-stats {
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 6px !important;
+    }
+
+    /* Definition lists: compact for print */
+    .lrms-dl {
+        gap: 8px 12px !important;
+    }
+
+    /* No transitions or animations in print */
+    * {
+        transition: none !important;
+        animation: none !important;
+    }
+
+    /* Links: no underline decorations */
+    a {
+        color: #000 !important;
+        text-decoration: none !important;
+    }
+    a[href]::after { content: none !important; }
+
+    /* Print-only elements become visible */
+    .print-only { display: block !important; }
+
+    /* Page break controls */
+    h1, h2, h3, h4, h5, h6 {
+        break-after: avoid;
+        page-break-after: avoid;
+    }
+
+    .lrms-fieldset,
+    .print-section {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    /* Report figures compact for print */
+    .lrms-figures {
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 6px !important;
+    }
+
+    .lrms-figure {
+        padding: 5px 8px !important;
+        background: #fff !important;
+        border: 1px solid #ddd !important;
+    }
+
+    /* Callouts in print */
+    .lrms-callout {
+        background: #fff !important;
+        border: 1px solid #ccc !important;
+        border-left-width: 3px !important;
+        padding: 6px 8px !important;
+    }
+
+    /* Print report specific: field grid alignment */
+    .field-grid {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 6px 12px !important;
+    }
+
+    .check-grid {
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 4px 8px !important;
+    }
+
+    /* Timeline: hide in print for clean reports */
+    .lrms-timeline { display: none !important; }
+
+    /* Gallery: reduce size for print */
+    .lrms-gallery {
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 4px !important;
+    }
+}
