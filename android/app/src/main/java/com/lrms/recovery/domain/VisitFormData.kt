@@ -33,6 +33,7 @@ class VisitFormData(
     var visitDate: String = ""
     var visitTime: String = ""
     var village: String = ""
+    var bcbfCode: String = ""
 
     // ---- 2. Borrower information -------------------------------------------
     // The identity fields the printed form asks for that the borrower record does not
@@ -438,6 +439,7 @@ class VisitFormData(
         clone.visitDate = visitDate
         clone.visitTime = visitTime
         clone.village = village
+        clone.bcbfCode = this.bcbfCode
         clone.gender = this.gender
         clone.dateOfBirth = this.dateOfBirth
         clone.panNumber = this.panNumber
@@ -1062,6 +1064,7 @@ class VisitFormData(
         fields["client_uuid"] = clientUuid
 
         putIfNotBlank(fields, "village", village)
+        putIfNotBlank(fields, "bcbf_code", bcbfCode)
 
         fields["customer_met"] = bool(customerMet)
         fields["family_member_met"] = bool(familyMemberMet)

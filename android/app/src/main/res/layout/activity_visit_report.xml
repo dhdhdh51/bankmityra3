@@ -170,6 +170,21 @@
                             android:inputType="textCapWords"
                             android:maxLines="1" />
                     </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/fieldBcbfCode"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:hint="@string/visit_bcbf_code">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/inputBcbfCode"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textCapCharacters"
+                            android:maxLines="1" />
+                    </com.google.android.material.textfield.TextInputLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -1269,6 +1284,13 @@
             <include
                 android:id="@+id/sectionCkccOd"
                 layout="@layout/partial_visit_ckcc_od"
+                android:visibility="gone"
+                tools:visibility="gone" />
+
+            <!-- ============ CKCC NPA KRM OTS Scheme ============ -->
+            <include
+                android:id="@+id/sectionNpaOts"
+                layout="@layout/partial_visit_npa_ots"
                 android:visibility="gone"
                 tools:visibility="gone" />
 

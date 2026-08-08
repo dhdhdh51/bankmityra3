@@ -106,9 +106,9 @@
     <string name="label_npa_date">संभावित NPA तिथि / NPA तिथि</string>
     <string name="label_status">स्थिति</string>
     <string name="label_branch">शाखा</string>
-    <string name="label_bc_code">BC कोड</string>
+    <string name="label_bc_code">BCBF कोड</string>
     <string name="label_visits">विज़िट</string>
-    <string name="label_agent">एजेंट</string>
+    <string name="label_agent">सुपरवाइज़र</string>
     <string name="visit_title">फ़ील्ड विज़िट रिपोर्ट</string>
     <string name="visit_section_general">सामान्य जानकारी</string>
     <string name="visit_section_borrower">ऋणी की जानकारी</string>
@@ -117,7 +117,7 @@
     <string name="visit_section_verification">भौतिक सत्यापन</string>
     <string name="visit_section_recovery">वसूली की संभावना</string>
     <string name="visit_section_reason">भुगतान न करने का कारण</string>
-    <string name="visit_section_recommendation">एजेंट की सिफ़ारिश</string>
+    <string name="visit_section_recommendation">सुपरवाइज़र की सिफ़ारिश</string>
     <string name="visit_section_remarks">टिप्पणियाँ</string>
     <string name="visit_section_documents">दस्तावेज़</string>
     <string name="visit_date">विज़िट की तारीख़</string>
@@ -312,9 +312,9 @@
     <string name="ckcc_form_signed">नवीनीकरण फ़ॉर्म पर हस्ताक्षर</string>
     <string name="ckcc_ekyc">आधार e-KYC पूरा</string>
     <string name="ckcc_biometrics">बायोमेट्रिक्स पूरा</string>
-    <string name="ckcc_group_observation">BC एजेंट का अवलोकन</string>
+    <string name="ckcc_group_observation">BC सुपरवाइज़र का अवलोकन</string>
     <string name="ckcc_observation">आपने क्या देखा और क्या बताया गया</string>
-    <string name="ckcc_group_recommendation">BC एजेंट की सिफ़ारिश</string>
+    <string name="ckcc_group_recommendation">BC सुपरवाइज़र की सिफ़ारिश</string>
     <string name="ckcc_rec_renew_now">नवीनीकरण तुरंत किया जाना चाहिए</string>
     <string name="ckcc_rec_docs_submitted">दस्तावेज़ पूरे</string>
     <string name="ckcc_rec_pending_documents">दस्तावेज़ अभी बाक़ी</string>

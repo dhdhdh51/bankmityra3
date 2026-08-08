@@ -1,0 +1,31 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Apply naming changes across the app: Replace 'BC agent' with 'BC Supervisor' in strings, replace 'Agent' label with 'Supervisor' where it refers to a role, and add BCBF Code field display in the report header/general section. The employee_code login field stays as-is (it is the login credential, not the role label).",
+  "status": "completed",
+  "steps": [
+    "1. In strings.xml, change: (a) ckcc_group_observation from 'BC agent observation' to 'BC Supervisor observation', (b) ckcc_group_recommendation from 'BC agent recommendation' to 'BC Supervisor recommendation', (c) label_agent from 'Agent' to 'Supervisor', (d) visit_section_recommendation from 'Agent recommendation' to 'Supervisor recommendation'.",
+    "2. In strings.xml, add new string: <string name=\"label_bcbf_code\">BCBF Code</string> and <string name=\"visit_bcbf_code\">BCBF Code</string>.",
+    "3. In VisitFormData.kt, add field: var bcbfCode: String = \"\". In toFieldMap(), add: putIfNotBlank(fields, \"bcbf_code\", bcbfCode).",
+    "4. In VisitReportActivity.kt setUpGeneral(), after the village field binding, add binding of the BCBF Code field: bindText(binding.inputBcbfCode) { form.bcbfCode = it }. Pre-fill from the session user's bcCode if available.",
+    "5. In activity_visit_report.xml inside the General section card, add a TextInputLayout for BCBF Code after the village field, with hint '@string/visit_bcbf_code'. Give it id fieldBcbfCode with EditText id inputBcbfCode.",
+    "6. In VisitDetailActivity.kt render(), where it displays bcCode, also handle displaying the BCBF Code. Update the label_bc_code string to 'BCBF Code' from 'BC code'.",
+    "7. Update the string label_bc_code from 'BC code' to 'BCBF Code' in strings.xml.",
+    "8. Verify no tests break due to label changes. Run all unit tests."
+  ],
+  "acceptance_criteria": [
+    "All instances of 'BC agent' in visible UI text now read 'BC Supervisor'",
+    "The label 'Agent' (where it refers to a role, not a person's name) now reads 'Supervisor'",
+    "A BCBF Code field appears in the General section of the visit report form",
+    "BCBF Code is serialized to the field map as 'bcbf_code'",
+    "The detail view shows 'BCBF Code' label instead of 'BC code'",
+    "./gradlew testDebugUnitTest passes",
+    "./gradlew assembleDebug passes"
+  ],
+  "verification": [
+    "cd /projects/bankmityra3/android && ./gradlew --no-daemon testDebugUnitTest",
+    "cd /projects/bankmityra3/android && ./gradlew --no-daemon assembleDebug"
+  ],
+  "blocked_reason": null,
+  "findings": "All naming changes applied successfully. BC agent -> BC Supervisor in ckcc_group_observation, ckcc_group_recommendation, ckcc_od_group_observation, ckcc_od_group_recommendation. Agent -> Supervisor in label_agent and visit_section_recommendation. BC code -> BCBF Code in label_bc_code. New visit_bcbf_code string added. bcbfCode field added to VisitFormData with serialization. BCBF Code TextInputLayout added to General section in layout. Hindi translations updated correspondingly. Build and tests pass."
+}

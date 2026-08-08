@@ -118,9 +118,9 @@
     <string name="label_npa_date">NPA date</string>
     <string name="label_status">Status</string>
     <string name="label_branch">Branch</string>
-    <string name="label_bc_code">BC code</string>
+    <string name="label_bc_code">BCBF Code</string>
     <string name="label_visits">Visits</string>
-    <string name="label_agent">Agent</string>
+    <string name="label_agent">Supervisor</string>
 
     <!-- ==================== Visit report ==================== -->
     <string name="visit_title">Field Visit Report</string>
@@ -131,12 +131,13 @@
     <string name="visit_section_verification">Physical verification</string>
     <string name="visit_section_recovery">Recovery possibility</string>
     <string name="visit_section_reason">Non-payment reason</string>
-    <string name="visit_section_recommendation">Agent recommendation</string>
+    <string name="visit_section_recommendation">Supervisor recommendation</string>
     <string name="visit_section_remarks">Remarks</string>
     <string name="visit_section_documents">Documents</string>
 
     <string name="visit_date">Visit date</string>
     <string name="visit_time">Visit time</string>
+    <string name="visit_bcbf_code">BCBF Code</string>
 
     <string name="visit_customer_met">Customer met</string>
     <string name="visit_family_met">Family member met</string>
@@ -398,9 +399,9 @@
     <string name="ckcc_form_signed">Renewal form signed</string>
     <string name="ckcc_ekyc">Aadhaar e-KYC completed</string>
     <string name="ckcc_biometrics">Biometrics completed</string>
-    <string name="ckcc_group_observation">BC agent observation</string>
+    <string name="ckcc_group_observation">BC Supervisor observation</string>
     <string name="ckcc_observation">What you saw and were told</string>
-    <string name="ckcc_group_recommendation">BC agent recommendation</string>
+    <string name="ckcc_group_recommendation">BC Supervisor recommendation</string>
     <string name="ckcc_rec_renew_now">Renewal should be processed immediately</string>
     <string name="ckcc_rec_docs_submitted">Documents complete</string>
     <string name="ckcc_rec_pending_documents">Documents still pending</string>
@@ -450,9 +451,9 @@
     <string name="ckcc_od_form_signed">Renewal form signed</string>
     <string name="ckcc_od_ekyc">Aadhaar e-KYC completed</string>
     <string name="ckcc_od_biometrics">Biometrics completed</string>
-    <string name="ckcc_od_group_observation">BC agent observation</string>
+    <string name="ckcc_od_group_observation">BC Supervisor observation</string>
     <string name="ckcc_od_observation">What you saw and were told</string>
-    <string name="ckcc_od_group_recommendation">BC agent recommendation</string>
+    <string name="ckcc_od_group_recommendation">BC Supervisor recommendation</string>
     <string name="ckcc_od_rec_renew_now">Renewal should be processed immediately</string>
     <string name="ckcc_od_rec_docs_submitted">Documents complete</string>
     <string name="ckcc_od_rec_pending_documents">Documents still pending</string>
@@ -470,6 +471,61 @@
     <string name="ckcc_od_st_pending_branch">Pending at branch</string>
     <string name="ckcc_od_st_followup">Follow-up required</string>
     <string name="ckcc_od_st_npa">Account became NPA</string>
+
+    <!-- CKCC NPA KRM OTS Scheme -->
+    <string name="npa_ots_section_title">CKCC NPA - KRM OTS SCHEME</string>
+    <string name="npa_ots_group_account">NPA Account Details</string>
+    <string name="npa_ots_cif">CIF Number</string>
+    <string name="npa_ots_sanction_date">Sanction Date</string>
+    <string name="npa_ots_sanction_limit">Sanction Limit</string>
+    <string name="npa_ots_drawing_power">Drawing Power</string>
+    <string name="npa_ots_outstanding">Outstanding</string>
+    <string name="npa_ots_interest_overdue">Interest Overdue</string>
+    <string name="npa_ots_npa_date">NPA Date</string>
+    <string name="npa_ots_days_past_due">Days Past Due</string>
+    <string name="npa_ots_asset_classification">Asset Classification</string>
+    <string name="npa_ots_group_eligibility">OTS Eligibility</string>
+    <string name="npa_ots_eligible">Eligible for OTS</string>
+    <string name="npa_ots_scheme">OTS Scheme</string>
+    <string name="npa_ots_scheme_other">Specify other scheme</string>
+    <string name="npa_ots_group_settlement">Settlement Amounts</string>
+    <string name="npa_ots_relief_percent">Relief / Waiver</string>
+    <string name="npa_ots_rlb_amount">RLB Amount</string>
+    <string name="npa_ots_payable_percent">Payable %</string>
+    <string name="npa_ots_payable_amount">Payable Amount</string>
+    <string name="npa_ots_total_settlement">Total Settlement</string>
+    <string name="npa_ots_group_deposit">Initial Deposit</string>
+    <string name="npa_ots_deposit_percent">Deposit %</string>
+    <string name="npa_ots_required_deposit">Required Deposit</string>
+    <string name="npa_ots_deposit_received">Deposit received from borrower</string>
+    <string name="npa_ots_deposit_amount">Deposit Amount</string>
+    <string name="npa_ots_deposit_date">Deposit Date</string>
+    <string name="npa_ots_deposit_reference">Receipt / Txn No.</string>
+    <string name="npa_ots_balance_payable">Balance Payable</string>
+    <string name="npa_ots_final_payment_date">Final Payment Date</string>
+    <string name="npa_ots_group_approval">Approval and Validity</string>
+    <string name="npa_ots_approval_status">Approval Status</string>
+    <string name="npa_ots_validity_from">Valid From</string>
+    <string name="npa_ots_validity_to">Valid To</string>
+    <string name="npa_ots_expected_closure">Expected Closure Date</string>
+    <string name="npa_ots_group_response">Borrower Response</string>
+    <string name="npa_ots_borrower_response">Borrower Response</string>
+    <string name="npa_ots_rejection_reason">Reason for refusal</string>
+    <string name="npa_ots_group_observation">Observation</string>
+    <string name="npa_ots_observation">What you saw and were told</string>
+    <string name="npa_ots_group_recommendation">Recommendation</string>
+    <string name="npa_ots_rec_proposal">OTS proposal recommended</string>
+    <string name="npa_ots_rec_followup">Follow-up required</string>
+    <string name="npa_ots_rec_refused">Customer refused OTS</string>
+    <string name="npa_ots_rec_not_eligible">Not eligible for OTS</string>
+    <string name="npa_ots_group_status">Report Status</string>
+    <string name="npa_ots_st_contacted">Customer contacted</string>
+    <string name="npa_ots_st_verified">Customer verified</string>
+    <string name="npa_ots_st_accepted">OTS accepted</string>
+    <string name="npa_ots_st_rejected">OTS rejected</string>
+    <string name="npa_ots_st_deposit">Initial deposit received</string>
+    <string name="npa_ots_st_closed">OTS closed</string>
+    <string name="npa_ots_st_followup">Follow-up required</string>
 
     <!-- Declaration -->
     <string name="visit_sp_cbc_name">SP / CBC name</string>

@@ -671,6 +671,7 @@ class VisitReportActivity : BaseActivity() {
         binding.fieldVisitTime.setEndIconOnClickListener { pickTime() }
 
         binding.inputVillage.doAfterTextChanged { form.village = it?.toString().orEmpty() }
+        binding.inputBcbfCode.doAfterTextChanged { form.bcbfCode = it?.toString().orEmpty() }
     }
 
     private fun pickDate() {
