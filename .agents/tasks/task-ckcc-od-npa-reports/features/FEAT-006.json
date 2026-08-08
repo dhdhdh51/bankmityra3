@@ -1,0 +1,36 @@
+{
+  "id": "FEAT-006",
+  "type": "feat",
+  "description": "Create ReportViewActivity.kt and its layout that displays the generated HTML report in a WebView with Print, PDF export, and Excel export buttons. Also create ExcelExporter.kt utility that exports form data as CSV (compatible with Excel). Register ReportViewActivity in AndroidManifest.xml. Wire report viewing from VisitReportActivity (after successful submission) and from VisitDetailActivity (View Report button).",
+  "status": "in_progress",
+  "steps": [
+    "1. Create android/app/src/main/res/layout/activity_report_view.xml: Toolbar at top with title 'Report View', a WebView filling the screen, and a bottom bar with three Material buttons: Print (ic_print icon), Save PDF (ic_download icon), Export Excel (ic_table icon). Proper padding and responsive layout.",
+    "2. Create android/app/src/main/java/com/lrms/recovery/report/ReportViewActivity.kt: Receives form data or report HTML via Intent extras. Loads HTML into WebView with settings enabling JavaScript and viewport fit. Print button uses Android PrintManager to create a print job from the WebView. PDF button uses the same PrintManager mechanism (createPrintDocumentAdapter). Excel button calls ExcelExporter.",
+    "3. Create android/app/src/main/java/com/lrms/recovery/report/ExcelExporter.kt: Takes VisitFormData (or a map of field labels to values) and generates a CSV file saved to the app's cache/files directory. The CSV has two columns: 'Field' and 'Value'. All form fields are listed in order matching the PDF report sections. Uses Intent.ACTION_SEND or MediaStore to share/save the file.",
+    "4. Register ReportViewActivity in AndroidManifest.xml: <activity android:name=\".report.ReportViewActivity\" android:exported=\"false\" /> after the VisitDetailActivity entry.",
+    "5. In VisitReportActivity.kt, after successful submission dialog, add a 'View Report' button/option that launches ReportViewActivity with the submitted form data. The dialog already has setPositiveButton('OK') that finishes - add a neutral button 'View Report' that opens ReportViewActivity.",
+    "6. In VisitDetailActivity.kt, add a 'View Report' button (FloatingActionButton or toolbar menu item) that fetches the report data and opens ReportViewActivity with it.",
+    "7. Add string resources: report_view_title, report_print, report_save_pdf, report_export_excel, report_saved, report_no_print_service.",
+    "8. Add drawable resources needed (ic_print, ic_download, ic_table) - use vector drawables from Material Icons.",
+    "9. Ensure WebView settings for proper A4 rendering: setUseWideViewPort(true), setLoadWithOverviewMode(true), initial scale.",
+    "10. Add unit test for ExcelExporter verifying CSV output format and content."
+  ],
+  "acceptance_criteria": [
+    "ReportViewActivity displays the HTML report correctly in a WebView",
+    "Print button opens Android print dialog",
+    "PDF button triggers PDF creation via PrintManager",
+    "Excel button generates and shares a CSV file",
+    "ReportViewActivity is registered in AndroidManifest.xml",
+    "After submission, user can tap 'View Report' to see the generated report",
+    "From VisitDetailActivity, user can view the report in formatted form",
+    "Responsive UI with no text overlay on any screen size",
+    "./gradlew assembleDebug passes",
+    "./gradlew testDebugUnitTest passes"
+  ],
+  "verification": [
+    "cd /projects/bankmityra3/android && JAVA_HOME=/opt/toolchains/.local/share/mise/installs/java/17.0.2 ./gradlew --no-daemon assembleDebug",
+    "cd /projects/bankmityra3/android && JAVA_HOME=/opt/toolchains/.local/share/mise/installs/java/17.0.2 ./gradlew --no-daemon testDebugUnitTest"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

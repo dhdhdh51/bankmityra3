@@ -4,5 +4,7 @@
     <cache-path name="captures" path="captures/" />
     <!-- Downloaded customer data sheets, shared out to a PDF viewer. -->
     <cache-path name="sheets" path="sheets/" />
+    <!-- CSV exports shared via Intent.ACTION_SEND. -->
+    <cache-path name="exports" path="exports/" />
     <files-path name="app_files" path="." />
 </paths>

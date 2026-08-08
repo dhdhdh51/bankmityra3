@@ -618,4 +618,17 @@
     <string name="account_language_hindi">हिन्दी</string>
     <string name="account_language_system">Phone\'s language</string>
     <string name="account_language_hint">The app\'s language. The report form keeps the wording that is printed on the paper copy.</string>
+    <!-- ===================================================================
+         Report View / Export
+         =================================================================== -->
+    <string name="report_view_title">Report View</string>
+    <string name="report_view_report">View Report</string>
+    <string name="report_print">Print</string>
+    <string name="report_save_pdf">Save PDF</string>
+    <string name="report_export_excel">Excel</string>
+    <string name="report_saved">Report saved</string>
+    <string name="report_exported">Report exported as CSV</string>
+    <string name="report_no_print_service">No print service available</string>
+    <string name="report_share_csv">Share report data</string>
+    <string name="report_coming_soon">Coming soon</string>
 </resources>

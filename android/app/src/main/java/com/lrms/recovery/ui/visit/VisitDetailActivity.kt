@@ -3,6 +3,8 @@ package com.lrms.recovery.ui.visit
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -215,6 +217,21 @@ class VisitDetailActivity : BaseActivity() {
 
     private fun yesNo(value: Boolean): String =
         getString(if (value) R.string.yes else R.string.no)
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.menu_visit_detail, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_view_report -> {
+                showMessage(getString(R.string.report_coming_soon), binding.root)
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
 
     companion object {
         private const val EXTRA_VISIT_ID = "visit_id"

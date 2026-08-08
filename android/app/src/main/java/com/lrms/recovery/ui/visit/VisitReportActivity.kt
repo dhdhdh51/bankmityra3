@@ -17,6 +17,8 @@ import com.lrms.recovery.R
 import com.lrms.recovery.data.ApiResult
 import com.lrms.recovery.databinding.ActivityVisitReportBinding
 import com.lrms.recovery.domain.VisitFormData
+import com.lrms.recovery.report.ReportGenerator
+import com.lrms.recovery.report.ReportViewActivity
 import com.lrms.recovery.ui.BaseActivity
 import com.lrms.recovery.location.GeoStamp
 import com.lrms.recovery.ui.photo.PhotoUploadActivity
@@ -1179,6 +1181,9 @@ class VisitReportActivity : BaseActivity() {
                             setResult(RESULT_OK)
                             finish()
                         }
+                        .setNeutralButton(R.string.report_view_report) { _, _ ->
+                            openReportView()
+                        }
                         .show()
                 }
 
@@ -1197,6 +1202,23 @@ class VisitReportActivity : BaseActivity() {
                 else -> handleFailure(result, binding.root)
             }
         }
+    }
+
+    private fun openReportView() {
+        val supplementary = buildSupplementaryData()
+        val html = ReportGenerator.generate(form, supplementary)
+        val fields = form.toFieldMap()
+        startActivity(ReportViewActivity.intent(this, html, fields))
+    }
+
+    private fun buildSupplementaryData(): ReportGenerator.SupplementaryData {
+        val customerName = intent.getStringExtra(EXTRA_CUSTOMER_NAME).orEmpty()
+        return ReportGenerator.SupplementaryData(
+            borrowerName = customerName,
+            loanAccountNumber = form.loanAccountId.toString(),
+            bcSupervisorName = session.user?.name.orEmpty(),
+            bcCode = form.bcbfCode,
+        )
     }
 
     private fun showValidationErrors(errors: Map<String, String>) {
