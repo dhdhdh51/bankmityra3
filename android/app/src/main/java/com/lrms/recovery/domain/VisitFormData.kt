@@ -267,6 +267,44 @@ data class VisitFormData(
     var ckccStFollowupRequired: Boolean = false,
     var ckccStBecameNpa: Boolean = false,
 
+    // ---- CKCC OD field report (report_type = ckcc_od) -----------------------
+    var ckccOdCifNumber: String = "",
+    var ckccOdSanctionDate: String = "",
+    var ckccOdSanctionLimit: String = "",
+    var ckccOdDrawingPower: String = "",
+    var ckccOdOutstanding: String = "",
+    var ckccOdInterestOverdue: String = "",
+    var ckccOdOdLimit: String = "",
+    var ckccOdOdUtilization: String = "",
+    var ckccOdLastCreditDate: String = "",
+    var ckccOdEligibleForRenewal: Boolean = false,
+    var ckccOdKycComplete: Boolean = false,
+    var ckccOdAadhaarSeeded: Boolean = false,
+    var ckccOdMobileLinked: Boolean = false,
+    var ckccOdAadhaarAuth: Boolean = false,
+    var ckccOdWillingToRenew: Boolean = false,
+    var ckccOdDocumentsHandedOver: Boolean = false,
+    var ckccOdRenewalFormSigned: Boolean = false,
+    var ckccOdEkycCompleted: Boolean = false,
+    var ckccOdBiometricsCompleted: Boolean = false,
+    var ckccOdObservation: String = "",
+    var ckccOdRecRenewImmediately: Boolean = false,
+    var ckccOdRecDocumentsSubmitted: Boolean = false,
+    var ckccOdRecPendingDocuments: Boolean = false,
+    var ckccOdRecFollowupRequired: Boolean = false,
+    var ckccOdRecNotInterested: Boolean = false,
+    var ckccOdRecBranchContactUrgent: Boolean = false,
+    var ckccOdRecOthers: Boolean = false,
+    var ckccOdRecOtherText: String = "",
+    var ckccOdStCustomerContacted: Boolean = false,
+    var ckccOdStCustomerVerified: Boolean = false,
+    var ckccOdStDocumentsCollected: Boolean = false,
+    var ckccOdStApplicationSubmitted: Boolean = false,
+    var ckccOdStRenewed: Boolean = false,
+    var ckccOdStPendingAtBranch: Boolean = false,
+    var ckccOdStFollowupRequired: Boolean = false,
+    var ckccOdStBecameNpa: Boolean = false,
+
     // ---- Declaration -------------------------------------------------------
     var spCbcName: String = "",
 
@@ -410,6 +448,7 @@ data class VisitFormData(
 
         errors += validateOts()
         errors += validateCkcc()
+        errors += validateCkccOd()
 
         return errors
     }
@@ -504,6 +543,28 @@ data class VisitFormData(
             "ckcc_sanction_limit" to ckccSanctionLimit,
             "ckcc_drawing_power" to ckccDrawingPower,
             "ckcc_interest_overdue" to ckccInterestOverdue,
+        )) {
+            if (raw.isNotBlank() && number(raw) == null) {
+                errors[key] = "Enter a valid amount"
+            }
+        }
+
+        return errors
+    }
+
+    private fun validateCkccOd(): Map<String, String> {
+        if (reportType != REPORT_CKCC_OD) return emptyMap()
+        val errors = mutableMapOf<String, String>()
+
+        if (ckccOdRecOthers && ckccOdRecOtherText.isBlank()) {
+            errors["ckcc_od_rec_other_text"] = "Describe the recommendation"
+        }
+        for ((key, raw) in listOf(
+            "ckcc_od_sanction_limit" to ckccOdSanctionLimit,
+            "ckcc_od_drawing_power" to ckccOdDrawingPower,
+            "ckcc_od_interest_overdue" to ckccOdInterestOverdue,
+            "ckcc_od_od_limit" to ckccOdOdLimit,
+            "ckcc_od_od_utilization" to ckccOdOdUtilization,
         )) {
             if (raw.isNotBlank() && number(raw) == null) {
                 errors[key] = "Enter a valid amount"
@@ -804,6 +865,49 @@ data class VisitFormData(
             fields["ckcc_details[st_became_npa]"] = bool(ckccStBecameNpa)
         }
 
+        if (reportType == REPORT_CKCC_OD) {
+            putIfNotBlank(fields, "ckcc_od_details[cif_number]", ckccOdCifNumber)
+            putIfNotBlank(fields, "ckcc_od_details[sanction_date]", ckccOdSanctionDate)
+            putAmount(fields, "ckcc_od_details[sanction_limit]", ckccOdSanctionLimit)
+            putAmount(fields, "ckcc_od_details[drawing_power]", ckccOdDrawingPower)
+            putAmount(fields, "ckcc_od_details[outstanding_amount]", ckccOdOutstanding)
+            putAmount(fields, "ckcc_od_details[interest_overdue]", ckccOdInterestOverdue)
+            putAmount(fields, "ckcc_od_details[od_limit]", ckccOdOdLimit)
+            putAmount(fields, "ckcc_od_details[od_utilization]", ckccOdOdUtilization)
+            putIfNotBlank(fields, "ckcc_od_details[last_credit_date]", ckccOdLastCreditDate)
+
+            fields["ckcc_od_details[eligible_for_renewal]"] = bool(ckccOdEligibleForRenewal)
+            fields["ckcc_od_details[kyc_status]"] = if (ckccOdKycComplete) "complete" else "pending"
+            fields["ckcc_od_details[aadhaar_seeded]"] = bool(ckccOdAadhaarSeeded)
+            fields["ckcc_od_details[mobile_linked]"] = bool(ckccOdMobileLinked)
+            fields["ckcc_od_details[aadhaar_auth_completed]"] = bool(ckccOdAadhaarAuth)
+
+            fields["ckcc_od_details[willing_to_renew]"] = bool(ckccOdWillingToRenew)
+            fields["ckcc_od_details[documents_handed_over]"] = bool(ckccOdDocumentsHandedOver)
+            fields["ckcc_od_details[renewal_form_signed]"] = bool(ckccOdRenewalFormSigned)
+            fields["ckcc_od_details[ekyc_completed]"] = bool(ckccOdEkycCompleted)
+            fields["ckcc_od_details[biometrics_completed]"] = bool(ckccOdBiometricsCompleted)
+
+            putIfNotBlank(fields, "ckcc_od_details[agent_observation]", ckccOdObservation)
+            fields["ckcc_od_details[rec_renew_immediately]"] = bool(ckccOdRecRenewImmediately)
+            fields["ckcc_od_details[rec_documents_submitted]"] = bool(ckccOdRecDocumentsSubmitted)
+            fields["ckcc_od_details[rec_pending_documents]"] = bool(ckccOdRecPendingDocuments)
+            fields["ckcc_od_details[rec_followup_required]"] = bool(ckccOdRecFollowupRequired)
+            fields["ckcc_od_details[rec_not_interested]"] = bool(ckccOdRecNotInterested)
+            fields["ckcc_od_details[rec_branch_contact_urgent]"] = bool(ckccOdRecBranchContactUrgent)
+            fields["ckcc_od_details[rec_others]"] = bool(ckccOdRecOthers)
+            putIfNotBlank(fields, "ckcc_od_details[rec_other_text]", ckccOdRecOtherText)
+
+            fields["ckcc_od_details[st_customer_contacted]"] = bool(ckccOdStCustomerContacted)
+            fields["ckcc_od_details[st_customer_verified]"] = bool(ckccOdStCustomerVerified)
+            fields["ckcc_od_details[st_documents_collected]"] = bool(ckccOdStDocumentsCollected)
+            fields["ckcc_od_details[st_application_submitted]"] = bool(ckccOdStApplicationSubmitted)
+            fields["ckcc_od_details[st_renewed]"] = bool(ckccOdStRenewed)
+            fields["ckcc_od_details[st_pending_at_branch]"] = bool(ckccOdStPendingAtBranch)
+            fields["ckcc_od_details[st_followup_required]"] = bool(ckccOdStFollowupRequired)
+            fields["ckcc_od_details[st_became_npa]"] = bool(ckccOdStBecameNpa)
+        }
+
         putIfNotBlank(fields, "remarks", remarks)
         putIfNotBlank(fields, "app_version", appVersion)
         putIfNotBlank(fields, "device_info", deviceInfo)
@@ -900,6 +1004,8 @@ data class VisitFormData(
             otsRlbAmount.isNotBlank() || otsPayableAmount.isNotBlank() ||
             otsDepositAmount.isNotBlank() || otsScheme.isNotBlank() ||
             ckccRenewalDueDate.isNotBlank() || ckccObservation.isNotBlank() ||
+            ckccOdObservation.isNotBlank() || ckccOdOdLimit.isNotBlank() ||
+            ckccOdSanctionLimit.isNotBlank() ||
             gender.isNotBlank() || dateOfBirth.isNotBlank() || panNumber.isNotBlank() ||
             addrVillage.isNotBlank() || gramPanchayat.isNotBlank() || tehsil.isNotBlank() ||
             addrDistrict.isNotBlank() || state.isNotBlank() || pinCode.isNotBlank() ||
@@ -940,6 +1046,7 @@ data class VisitFormData(
         const val REPORT_RECOVERY = "recovery"
         const val REPORT_OTS = "ots"
         const val REPORT_CKCC = "ckcc_renewal"
+        const val REPORT_CKCC_OD = "ckcc_od"
         const val REPORT_PRE_NPA = "pre_npa"
         const val REPORT_POST_NPA = "post_npa"
         const val REPORT_OTHER = "other"
@@ -963,6 +1070,7 @@ data class VisitFormData(
         val REPORT_TYPES = listOf(
             REPORT_OTS to "KRM OTS",
             REPORT_CKCC to "CKCC OD-2 Renewal",
+            REPORT_CKCC_OD to "CKCC OD Field Report",
             REPORT_RECOVERY to "Recovery Follow-up",
             REPORT_PRE_NPA to "Pre-NPA Verification",
             REPORT_POST_NPA to "Post-NPA Verification",

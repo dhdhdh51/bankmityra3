@@ -153,6 +153,7 @@ class VisitReportActivity : BaseActivity() {
         setUpAttachments()
         setUpOts()
         setUpCkcc()
+        setUpCkccOd()
 
         binding.buttonSubmit.setOnClickListener { submit() }
 
@@ -202,6 +203,8 @@ class VisitReportActivity : BaseActivity() {
             if (form.reportType == VisitFormData.REPORT_OTS) View.VISIBLE else View.GONE
         binding.sectionCkcc.root.visibility =
             if (form.reportType == VisitFormData.REPORT_CKCC) View.VISIBLE else View.GONE
+        binding.sectionCkccOd.root.visibility =
+            if (form.reportType == VisitFormData.REPORT_CKCC_OD) View.VISIBLE else View.GONE
     }
 
     // =======================================================================
@@ -460,6 +463,59 @@ class VisitReportActivity : BaseActivity() {
         }
         c.chipCkccBucket.visibility = View.VISIBLE
         c.chipCkccBucket.setText(bucketLabel)
+    }
+
+    // =======================================================================
+    // CKCC OD Field Report
+    // =======================================================================
+
+    private fun setUpCkccOd() {
+        val c = binding.sectionCkccOd
+
+        bindText(c.inputCkccOdCif) { form.ckccOdCifNumber = it }
+        bindText(c.inputCkccOdSanctionLimit) { form.ckccOdSanctionLimit = it }
+        bindText(c.inputCkccOdDrawingPower) { form.ckccOdDrawingPower = it }
+        bindText(c.inputCkccOdOutstanding) { form.ckccOdOutstanding = it }
+        bindText(c.inputCkccOdInterestOverdue) { form.ckccOdInterestOverdue = it }
+        bindText(c.inputCkccOdLimit) { form.ckccOdOdLimit = it }
+        bindText(c.inputCkccOdUtilization) { form.ckccOdOdUtilization = it }
+        bindText(c.inputCkccOdObservation) { form.ckccOdObservation = it }
+        bindText(c.inputCkccOdRecOtherText) { form.ckccOdRecOtherText = it }
+
+        bindDate(c.inputCkccOdSanctionDate) { form.ckccOdSanctionDate = it }
+        bindDate(c.inputCkccOdLastCreditDate) { form.ckccOdLastCreditDate = it }
+
+        c.switchCkccOdEligible.setOnCheckedChangeListener { _, v -> form.ckccOdEligibleForRenewal = v }
+        c.checkCkccOdKyc.setOnCheckedChangeListener { _, v -> form.ckccOdKycComplete = v }
+        c.checkCkccOdAadhaarSeeded.setOnCheckedChangeListener { _, v -> form.ckccOdAadhaarSeeded = v }
+        c.checkCkccOdMobileLinked.setOnCheckedChangeListener { _, v -> form.ckccOdMobileLinked = v }
+        c.checkCkccOdAadhaarAuth.setOnCheckedChangeListener { _, v -> form.ckccOdAadhaarAuth = v }
+
+        c.checkCkccOdWilling.setOnCheckedChangeListener { _, v -> form.ckccOdWillingToRenew = v }
+        c.checkCkccOdDocsHanded.setOnCheckedChangeListener { _, v -> form.ckccOdDocumentsHandedOver = v }
+        c.checkCkccOdFormSigned.setOnCheckedChangeListener { _, v -> form.ckccOdRenewalFormSigned = v }
+        c.checkCkccOdEkyc.setOnCheckedChangeListener { _, v -> form.ckccOdEkycCompleted = v }
+        c.checkCkccOdBiometrics.setOnCheckedChangeListener { _, v -> form.ckccOdBiometricsCompleted = v }
+
+        c.checkCkccOdRecRenewNow.setOnCheckedChangeListener { _, v -> form.ckccOdRecRenewImmediately = v }
+        c.checkCkccOdRecDocsSubmitted.setOnCheckedChangeListener { _, v -> form.ckccOdRecDocumentsSubmitted = v }
+        c.checkCkccOdRecPendingDocs.setOnCheckedChangeListener { _, v -> form.ckccOdRecPendingDocuments = v }
+        c.checkCkccOdRecFollowup.setOnCheckedChangeListener { _, v -> form.ckccOdRecFollowupRequired = v }
+        c.checkCkccOdRecNotInterested.setOnCheckedChangeListener { _, v -> form.ckccOdRecNotInterested = v }
+        c.checkCkccOdRecBranchUrgent.setOnCheckedChangeListener { _, v -> form.ckccOdRecBranchContactUrgent = v }
+        c.checkCkccOdRecOther.setOnCheckedChangeListener { _, v ->
+            form.ckccOdRecOthers = v
+            c.fieldCkccOdRecOtherText.visibility = if (v) View.VISIBLE else View.GONE
+        }
+
+        c.checkCkccOdStContacted.setOnCheckedChangeListener { _, v -> form.ckccOdStCustomerContacted = v }
+        c.checkCkccOdStVerified.setOnCheckedChangeListener { _, v -> form.ckccOdStCustomerVerified = v }
+        c.checkCkccOdStDocsCollected.setOnCheckedChangeListener { _, v -> form.ckccOdStDocumentsCollected = v }
+        c.checkCkccOdStSubmitted.setOnCheckedChangeListener { _, v -> form.ckccOdStApplicationSubmitted = v }
+        c.checkCkccOdStRenewed.setOnCheckedChangeListener { _, v -> form.ckccOdStRenewed = v }
+        c.checkCkccOdStPendingBranch.setOnCheckedChangeListener { _, v -> form.ckccOdStPendingAtBranch = v }
+        c.checkCkccOdStFollowup.setOnCheckedChangeListener { _, v -> form.ckccOdStFollowupRequired = v }
+        c.checkCkccOdStNpa.setOnCheckedChangeListener { _, v -> form.ckccOdStBecameNpa = v }
     }
 
     // =======================================================================

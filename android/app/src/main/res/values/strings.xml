@@ -424,6 +424,53 @@
     <string name="ckcc_bucket_15">Within 15 Days</string>
     <string name="ckcc_bucket_30">Within 30 Days</string>
 
+    <!-- CKCC OD Field Report -->
+    <string name="report_type_ckcc_od">CKCC OD Field Report</string>
+    <string name="ckcc_od_section_title">CKCC OD FIELD REPORT</string>
+    <string name="ckcc_od_group_account">Account details</string>
+    <string name="ckcc_od_cif">CIF number</string>
+    <string name="ckcc_od_sanction_date">Sanction date</string>
+    <string name="ckcc_od_sanction_limit">Sanction limit</string>
+    <string name="ckcc_od_drawing_power">Drawing power</string>
+    <string name="ckcc_od_outstanding">Outstanding amount</string>
+    <string name="ckcc_od_interest_overdue">Interest overdue</string>
+    <string name="ckcc_od_group_od_details">OD details</string>
+    <string name="ckcc_od_limit">OD limit</string>
+    <string name="ckcc_od_utilization">OD utilization</string>
+    <string name="ckcc_od_last_credit_date">Last credit date</string>
+    <string name="ckcc_od_group_eligibility">Renewal eligibility</string>
+    <string name="ckcc_od_eligible">Eligible for renewal</string>
+    <string name="ckcc_od_kyc_complete">KYC complete</string>
+    <string name="ckcc_od_aadhaar_seeded">Aadhaar seeded</string>
+    <string name="ckcc_od_mobile_linked">Mobile linked</string>
+    <string name="ckcc_od_aadhaar_auth">Aadhaar authentication completed</string>
+    <string name="ckcc_od_group_consent">Renewal consent</string>
+    <string name="ckcc_od_willing">Borrower willing to renew</string>
+    <string name="ckcc_od_documents_handed">Documents handed over</string>
+    <string name="ckcc_od_form_signed">Renewal form signed</string>
+    <string name="ckcc_od_ekyc">Aadhaar e-KYC completed</string>
+    <string name="ckcc_od_biometrics">Biometrics completed</string>
+    <string name="ckcc_od_group_observation">BC agent observation</string>
+    <string name="ckcc_od_observation">What you saw and were told</string>
+    <string name="ckcc_od_group_recommendation">BC agent recommendation</string>
+    <string name="ckcc_od_rec_renew_now">Renewal should be processed immediately</string>
+    <string name="ckcc_od_rec_docs_submitted">Documents complete</string>
+    <string name="ckcc_od_rec_pending_documents">Documents still pending</string>
+    <string name="ckcc_od_rec_followup">Follow-up required</string>
+    <string name="ckcc_od_rec_not_interested">Customer not interested in renewal</string>
+    <string name="ckcc_od_rec_branch_urgent">Branch should contact customer urgently</string>
+    <string name="ckcc_od_rec_other">Other recommendation</string>
+    <string name="ckcc_od_rec_other_text">Which other recommendation</string>
+    <string name="ckcc_od_group_status">Report status</string>
+    <string name="ckcc_od_st_contacted">Customer contacted</string>
+    <string name="ckcc_od_st_verified">Customer verified</string>
+    <string name="ckcc_od_st_docs_collected">Renewal documents collected</string>
+    <string name="ckcc_od_st_submitted">Renewal application submitted</string>
+    <string name="ckcc_od_st_renewed">OD renewed</string>
+    <string name="ckcc_od_st_pending_branch">Pending at branch</string>
+    <string name="ckcc_od_st_followup">Follow-up required</string>
+    <string name="ckcc_od_st_npa">Account became NPA</string>
+
     <!-- Declaration -->
     <string name="visit_sp_cbc_name">SP / CBC name</string>
 

@@ -1,0 +1,532 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    CKCC OD Field Report section.
+
+    A dedicated form for CKCC Overdraft cases, separate from the existing CKCC
+    OD-2 renewal report. No Borrower Signature field. Includes all relevant
+    CKCC account data fields plus OD-specific fields (OD Limit, OD Utilization,
+    Last Credit Date).
+-->
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="12dp"
+    app:strokeColor="@color/lrms_primary_light"
+    app:strokeWidth="1dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="3dp"
+            android:background="@color/lrms_primary" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="14dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="10dp"
+                android:text="@string/ckcc_od_section_title"
+                android:textAppearance="@style/TextAppearance.LRMS.SectionLabel"
+                android:textColor="@color/lrms_primary" />
+
+            <!-- ===== Account details ===== -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="8dp"
+                android:text="@string/ckcc_od_group_account"
+                android:textAppearance="@style/TextAppearance.LRMS.FieldLabel" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/fieldCkccOdCif"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:hint="@string/ckcc_od_cif">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/inputCkccOdCif"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textCapCharacters"
+                        android:maxLines="1" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/fieldCkccOdSanctionDate"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:hint="@string/ckcc_od_sanction_date"
+                    app:endIconDrawable="@drawable/ic_calendar"
+                    app:endIconMode="custom">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/inputCkccOdSanctionDate"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:cursorVisible="false"
+                        android:focusable="false"
+                        android:inputType="none"
+                        android:maxLines="1" />
+                </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/fieldCkccOdSanctionLimit"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:hint="@string/ckcc_od_sanction_limit"
+                    app:prefixText="@string/rupee">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/inputCkccOdSanctionLimit"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="numberDecimal"
+                        android:maxLines="1" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/fieldCkccOdDrawingPower"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:hint="@string/ckcc_od_drawing_power"
+                    app:prefixText="@string/rupee">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/inputCkccOdDrawingPower"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="numberDecimal"
+                        android:maxLines="1" />
+                </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/fieldCkccOdOutstanding"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:hint="@string/ckcc_od_outstanding"
+                    app:prefixText="@string/rupee">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/inputCkccOdOutstanding"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="numberDecimal"
+                        android:maxLines="1" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/fieldCkccOdInterestOverdue"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:hint="@string/ckcc_od_interest_overdue"
+                    app:prefixText="@string/rupee">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/inputCkccOdInterestOverdue"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="numberDecimal"
+                        android:maxLines="1" />
+                </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="14dp"
+                android:layout_marginBottom="10dp"
+                android:background="@color/lrms_border" />
+
+            <!-- ===== OD-specific fields ===== -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="8dp"
+                android:text="@string/ckcc_od_group_od_details"
+                android:textAppearance="@style/TextAppearance.LRMS.FieldLabel" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/fieldCkccOdLimit"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:hint="@string/ckcc_od_limit"
+                    app:prefixText="@string/rupee">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/inputCkccOdLimit"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="numberDecimal"
+                        android:maxLines="1" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/fieldCkccOdUtilization"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:hint="@string/ckcc_od_utilization"
+                    app:prefixText="@string/rupee">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/inputCkccOdUtilization"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="numberDecimal"
+                        android:maxLines="1" />
+                </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/fieldCkccOdLastCreditDate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:hint="@string/ckcc_od_last_credit_date"
+                app:endIconDrawable="@drawable/ic_calendar"
+                app:endIconMode="custom">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/inputCkccOdLastCreditDate"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:cursorVisible="false"
+                    android:focusable="false"
+                    android:inputType="none"
+                    android:maxLines="1" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="14dp"
+                android:layout_marginBottom="6dp"
+                android:background="@color/lrms_border" />
+
+            <!-- ===== Renewal eligibility ===== -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="4dp"
+                android:text="@string/ckcc_od_group_eligibility"
+                android:textAppearance="@style/TextAppearance.LRMS.FieldLabel" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switchCkccOdEligible"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:text="@string/ckcc_od_eligible" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdKyc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_kyc_complete" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdAadhaarSeeded"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_aadhaar_seeded" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdMobileLinked"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_mobile_linked" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdAadhaarAuth"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_aadhaar_auth" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="10dp"
+                android:layout_marginBottom="6dp"
+                android:background="@color/lrms_border" />
+
+            <!-- ===== Renewal consent ===== -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="4dp"
+                android:text="@string/ckcc_od_group_consent"
+                android:textAppearance="@style/TextAppearance.LRMS.FieldLabel" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdWilling"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_willing" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdDocsHanded"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_documents_handed" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdFormSigned"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_form_signed" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdEkyc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_ekyc" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdBiometrics"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_biometrics" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="10dp"
+                android:layout_marginBottom="10dp"
+                android:background="@color/lrms_border" />
+
+            <!-- ===== Observation ===== -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="8dp"
+                android:text="@string/ckcc_od_group_observation"
+                android:textAppearance="@style/TextAppearance.LRMS.FieldLabel" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/fieldCkccOdObservation"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/ckcc_od_observation">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/inputCkccOdObservation"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="top"
+                    android:inputType="textMultiLine|textCapSentences"
+                    android:minLines="3" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="14dp"
+                android:layout_marginBottom="6dp"
+                android:background="@color/lrms_border" />
+
+            <!-- ===== Recommendation ===== -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="4dp"
+                android:text="@string/ckcc_od_group_recommendation"
+                android:textAppearance="@style/TextAppearance.LRMS.FieldLabel" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdRecRenewNow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_rec_renew_now" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdRecDocsSubmitted"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_rec_docs_submitted" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdRecPendingDocs"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_rec_pending_documents" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdRecFollowup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_rec_followup" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdRecNotInterested"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_rec_not_interested" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdRecBranchUrgent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_rec_branch_urgent" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdRecOther"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_rec_other" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/fieldCkccOdRecOtherText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:hint="@string/ckcc_od_rec_other_text"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/inputCkccOdRecOtherText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textCapSentences"
+                    android:maxLines="1" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="10dp"
+                android:layout_marginBottom="6dp"
+                android:background="@color/lrms_border" />
+
+            <!-- ===== Report status ===== -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="4dp"
+                android:text="@string/ckcc_od_group_status"
+                android:textAppearance="@style/TextAppearance.LRMS.FieldLabel" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdStContacted"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_st_contacted" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdStVerified"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_st_verified" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdStDocsCollected"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_st_docs_collected" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdStSubmitted"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_st_submitted" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdStRenewed"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_st_renewed" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdStPendingBranch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_st_pending_branch" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdStFollowup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_st_followup" />
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkCkccOdStNpa"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:text="@string/ckcc_od_st_npa" />
+        </LinearLayout>
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

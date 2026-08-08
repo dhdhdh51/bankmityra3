@@ -605,9 +605,9 @@ class VisitFormDataTest {
 
     @Test
     fun `the case type list is the printed form's, in its order`() {
-        assertEquals(6, VisitFormData.REPORT_TYPES.size)
+        assertEquals(7, VisitFormData.REPORT_TYPES.size)
         assertEquals(
-            listOf("ots", "ckcc_renewal", "recovery", "pre_npa", "post_npa", "other"),
+            listOf("ots", "ckcc_renewal", "ckcc_od", "recovery", "pre_npa", "post_npa", "other"),
             VisitFormData.REPORT_TYPES.map { it.first },
         )
     }
@@ -867,5 +867,114 @@ class VisitFormDataTest {
         assertTrue(validForm().apply { evGpsLocation = true }.hasUnsavedInput())
         assertTrue(validForm().apply { residenceVerified = "confirmed" }.hasUnsavedInput())
         assertTrue(validForm().apply { generalRecommendation = "Follow up" }.hasUnsavedInput())
+    }
+
+    // =======================================================================
+    // CKCC OD Field Report
+    // =======================================================================
+
+    private fun ckccOdForm(): VisitFormData = VisitFormData(
+        loanAccountId = 7,
+        reportType = VisitFormData.REPORT_CKCC_OD,
+        visitDate = "2026-07-31",
+        visitTime = "10:30:00",
+        customerMet = true,
+        declarationAccepted = true,
+    )
+
+    @Test
+    fun `CKCC OD fields are serialized under ckcc_od_details prefix`() {
+        val form = ckccOdForm().apply {
+            ckccOdCifNumber = "CIF123"
+            ckccOdSanctionDate = "2025-01-15"
+            ckccOdSanctionLimit = "3,00,000"
+            ckccOdDrawingPower = "2,75,000"
+            ckccOdOutstanding = "1,50,000"
+            ckccOdInterestOverdue = "5000"
+            ckccOdOdLimit = "2,00,000"
+            ckccOdOdUtilization = "1,80,000"
+            ckccOdLastCreditDate = "2026-06-15"
+            ckccOdEligibleForRenewal = true
+            ckccOdKycComplete = true
+            ckccOdAadhaarSeeded = true
+            ckccOdMobileLinked = false
+            ckccOdAadhaarAuth = true
+            ckccOdWillingToRenew = true
+            ckccOdDocumentsHandedOver = true
+            ckccOdRenewalFormSigned = true
+            ckccOdEkycCompleted = false
+            ckccOdBiometricsCompleted = false
+            ckccOdObservation = "OD account in good standing"
+            ckccOdRecRenewImmediately = true
+            ckccOdStCustomerContacted = true
+        }
+        val fields = form.toFieldMap()
+
+        assertEquals("ckcc_od", fields["report_type"])
+        assertEquals("CIF123", fields["ckcc_od_details[cif_number]"])
+        assertEquals("2025-01-15", fields["ckcc_od_details[sanction_date]"])
+        assertEquals("300000.0", fields["ckcc_od_details[sanction_limit]"])
+        assertEquals("275000.0", fields["ckcc_od_details[drawing_power]"])
+        assertEquals("150000.0", fields["ckcc_od_details[outstanding_amount]"])
+        assertEquals("5000.0", fields["ckcc_od_details[interest_overdue]"])
+        assertEquals("200000.0", fields["ckcc_od_details[od_limit]"])
+        assertEquals("180000.0", fields["ckcc_od_details[od_utilization]"])
+        assertEquals("2026-06-15", fields["ckcc_od_details[last_credit_date]"])
+        assertEquals("1", fields["ckcc_od_details[eligible_for_renewal]"])
+        assertEquals("complete", fields["ckcc_od_details[kyc_status]"])
+        assertEquals("1", fields["ckcc_od_details[aadhaar_seeded]"])
+        assertEquals("0", fields["ckcc_od_details[mobile_linked]"])
+        assertEquals("1", fields["ckcc_od_details[aadhaar_auth_completed]"])
+        assertEquals("1", fields["ckcc_od_details[willing_to_renew]"])
+        assertEquals("1", fields["ckcc_od_details[documents_handed_over]"])
+        assertEquals("1", fields["ckcc_od_details[renewal_form_signed]"])
+        assertEquals("0", fields["ckcc_od_details[ekyc_completed]"])
+        assertEquals("0", fields["ckcc_od_details[biometrics_completed]"])
+        assertEquals("OD account in good standing", fields["ckcc_od_details[agent_observation]"])
+        assertEquals("1", fields["ckcc_od_details[rec_renew_immediately]"])
+        assertEquals("1", fields["ckcc_od_details[st_customer_contacted]"])
+
+        // Must not send other section details
+        assertTrue(fields.keys.none { it.startsWith("ots_details") })
+        assertTrue(fields.keys.none { it.startsWith("ckcc_details[") })
+    }
+
+    @Test
+    fun `CKCC OD validation passes for a valid form`() {
+        val errors = ckccOdForm().validate()
+        assertTrue(errors.isEmpty())
+    }
+
+    @Test
+    fun `CKCC OD unparseable amounts are rejected`() {
+        val errors = ckccOdForm().apply {
+            ckccOdSanctionLimit = "three lakh"
+            ckccOdOdLimit = "not a number"
+        }.validate()
+        assertTrue(errors.containsKey("ckcc_od_sanction_limit"))
+        assertTrue(errors.containsKey("ckcc_od_od_limit"))
+    }
+
+    @Test
+    fun `a recovery report does not send ckcc_od_details`() {
+        val fields = validForm().toFieldMap()
+        assertEquals("recovery", fields["report_type"])
+        assertTrue(fields.keys.none { it.startsWith("ckcc_od_details") })
+    }
+
+    @Test
+    fun `CKCC OD other recommendation requires text`() {
+        val errors = ckccOdForm().apply {
+            ckccOdRecOthers = true
+            ckccOdRecOtherText = ""
+        }.validate()
+        assertTrue(errors.containsKey("ckcc_od_rec_other_text"))
+    }
+
+    @Test
+    fun `CKCC OD observation counts as unsaved input`() {
+        val form = VisitFormData(loanAccountId = 1, visitDate = "2026-07-30", visitTime = "10:00")
+        assertFalse(form.hasUnsavedInput())
+        assertTrue(form.copy(ckccOdObservation = "test").hasUnsavedInput())
     }
 }

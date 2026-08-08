@@ -313,6 +313,10 @@
                 "label": "CKCC OD-2 Renewal"
             },
             {
+                "value": "ckcc_od",
+                "label": "CKCC OD Field Report"
+            },
+            {
                 "value": "recovery",
                 "label": "Recovery Follow-up"
             },

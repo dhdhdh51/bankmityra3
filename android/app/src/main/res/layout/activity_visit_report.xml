@@ -1265,6 +1265,13 @@
                 android:visibility="gone"
                 tools:visibility="visible" />
 
+            <!-- ============ CKCC OD Field Report ============ -->
+            <include
+                android:id="@+id/sectionCkccOd"
+                layout="@layout/partial_visit_ckcc_od"
+                android:visibility="gone"
+                tools:visibility="gone" />
+
             <!-- ============ Documents ============ -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"

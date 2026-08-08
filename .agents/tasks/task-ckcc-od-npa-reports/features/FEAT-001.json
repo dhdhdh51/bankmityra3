@@ -1,0 +1,35 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Add CKCC OD Field Report as a new separate report type. This creates a dedicated form for CKCC OD (Overdraft) cases, distinct from the existing CKCC OD-2 renewal report. No Borrower Signature field. Includes all relevant CKCC account data fields plus OD-specific fields.",
+  "status": "in_progress",
+  "steps": [
+    "1. In VisitFormData.kt companion object, add new constant REPORT_CKCC_OD = \"ckcc_od\" and add it to REPORT_TYPES list as (REPORT_CKCC_OD to \"CKCC OD Field Report\") after the CKCC entry.",
+    "2. In VisitFormData.kt, add new fields for the CKCC OD report section, prefixed with 'ckccOd'. Fields: ckccOdCifNumber, ckccOdSanctionDate, ckccOdSanctionLimit, ckccOdDrawingPower, ckccOdOutstanding, ckccOdInterestOverdue, ckccOdOdLimit, ckccOdOdUtilization, ckccOdLastCreditDate, ckccOdEligibleForRenewal (Boolean), ckccOdKycComplete (Boolean), ckccOdAadhaarSeeded (Boolean), ckccOdMobileLinked (Boolean), ckccOdAadhaarAuth (Boolean), ckccOdWillingToRenew (Boolean), ckccOdDocumentsHandedOver (Boolean), ckccOdRenewalFormSigned (Boolean), ckccOdEkycCompleted (Boolean), ckccOdBiometricsCompleted (Boolean), ckccOdObservation (String), ckccOdRecRenewImmediately (Boolean), ckccOdRecDocumentsSubmitted (Boolean), ckccOdRecPendingDocuments (Boolean), ckccOdRecFollowupRequired (Boolean), ckccOdRecNotInterested (Boolean), ckccOdRecBranchContactUrgent (Boolean), ckccOdRecOthers (Boolean), ckccOdRecOtherText (String), ckccOdStCustomerContacted (Boolean), ckccOdStCustomerVerified (Boolean), ckccOdStDocumentsCollected (Boolean), ckccOdStApplicationSubmitted (Boolean), ckccOdStRenewed (Boolean), ckccOdStPendingAtBranch (Boolean), ckccOdStFollowupRequired (Boolean), ckccOdStBecameNpa (Boolean).",
+    "3. In VisitFormData.kt, add validateCkccOd() method following the same pattern as validateCkcc() - no mandatory renewal due date but validate amounts are parseable. Call it from validate().",
+    "4. In VisitFormData.kt toFieldMap(), add a block: if (reportType == REPORT_CKCC_OD) { ... } that sends all ckccOd fields under 'ckcc_od_details[field]' prefix following the same pattern as CKCC and OTS serialization.",
+    "5. In VisitFormData.kt hasUnsavedInput(), add ckccOd fields to the condition (e.g., ckccOdObservation.isNotBlank()).",
+    "6. Create new layout file android/app/src/main/res/layout/partial_visit_ckcc_od.xml following the exact same structure as partial_visit_ckcc.xml but with: (a) title 'CKCC OD FIELD REPORT', (b) extra OD-specific fields (OD Limit, OD Utilization, Last Credit Date), (c) no Borrower Signature, (d) proper 14dp padding, 6dp between side-by-side fields, same MaterialCardView styling. Use accent strip at top (3dp height, lrms_primary).",
+    "7. In activity_visit_report.xml, add an <include> for the new partial layout after the existing CKCC include: <include android:id=\"@+id/sectionCkccOd\" layout=\"@layout/partial_visit_ckcc_od\" />",
+    "8. In VisitReportActivity.kt applyReportType(), add visibility toggle: binding.sectionCkccOd.root.visibility = if (form.reportType == VisitFormData.REPORT_CKCC_OD) View.VISIBLE else View.GONE",
+    "9. In VisitReportActivity.kt, add setUpCkccOd() method following setUpCkcc() pattern - binding all fields from the partial layout to form fields using bindText, bindDate, setOnCheckedChangeListener. Call it from onCreate().",
+    "10. Add all new string resources to strings.xml under a new section '<!-- CKCC OD Field Report -->'.",
+    "11. Add unit tests in VisitFormDataTest.kt: (a) CKCC OD fields are serialized correctly under ckcc_od_details prefix, (b) validation passes for valid CKCC OD form, (c) unparseable amounts are rejected, (d) a recovery report does not send ckcc_od_details."
+  ],
+  "acceptance_criteria": [
+    "The report type dropdown shows 'CKCC OD Field Report' as an option",
+    "Selecting it shows the CKCC OD partial layout and hides other type-specific sections",
+    "All CKCC OD fields are serialized to the field map under 'ckcc_od_details[...]' prefix",
+    "No Borrower Signature field exists in the CKCC OD form",
+    "Unit tests pass for validation and serialization of CKCC OD report",
+    "The existing CKCC partial layout (partial_visit_ckcc.xml) is NOT modified",
+    "./gradlew testDebugUnitTest passes",
+    "./gradlew assembleDebug passes"
+  ],
+  "verification": [
+    "cd /projects/bankmityra3/android && ./gradlew --no-daemon testDebugUnitTest",
+    "cd /projects/bankmityra3/android && ./gradlew --no-daemon assembleDebug"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
