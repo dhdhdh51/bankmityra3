@@ -82,6 +82,14 @@ final class ReportService
             'label'       => 'OD-2 Renewal Worklist',
             'description' => 'OD-2 accounts by renewal due date, soonest first',
         ],
+        'ckcc-od' => [
+            'label'       => 'CKCC OD Field Report',
+            'description' => 'CKCC OD case field verification reports with supervisor details',
+        ],
+        'ckcc-npa-krm' => [
+            'label'       => 'CKCC NPA / KRM OTS Field Report',
+            'description' => 'NPA accounts under KRM OTS Scheme field verification reports',
+        ],
     ];
 
     public static function isValidType(string $type): bool
@@ -119,6 +127,8 @@ final class ReportService
             // they contain, and duplicating the query would let them drift apart.
             'kcc-renewal' => self::renewalWorklist($filters, 'kcc'),
             'od2-renewal' => self::renewalWorklist($filters, 'od2'),
+            'ckcc-od'      => self::ckccOdReport($filters),
+            'ckcc-npa-krm' => self::ckccNpaKrmReport($filters),
             default     => throw new \InvalidArgumentException('Unknown report type: ' . $type),
         };
     }
@@ -1386,6 +1396,215 @@ final class ReportService
     private static function filename(string $type): string
     {
         return 'lrms_' . str_replace('-', '_', $type) . '_report_' . date('Ymd_His');
+    }
+
+    // =======================================================================
+    // 12. CKCC OD Field Report
+    // =======================================================================
+
+    /**
+     * CKCC OD case field verification reports joined with visit_ckcc_details.
+     * Completely separate from the existing OD-2 renewal worklist.
+     *
+     * @param array<string,mixed> $filters
+     */
+    private static function ckccOdReport(array $filters): array
+    {
+        [$scope, $params] = self::scope($filters, 'vr');
+
+        $dateFrom = self::dateOrNull($filters['date_from'] ?? null);
+        $dateTo = self::dateOrNull($filters['date_to'] ?? null);
+
+        $dateClause = '';
+        $dateParams = [];
+        if ($dateFrom !== null) {
+            $dateClause .= ' AND vr.visit_date >= ?';
+            $dateParams[] = $dateFrom;
+        }
+        if ($dateTo !== null) {
+            $dateClause .= ' AND vr.visit_date <= ?';
+            $dateParams[] = $dateTo;
+        }
+
+        $rows = Database::instance()->all(
+            "SELECT vr.visit_date,
+                    vr.agent_name,
+                    COALESCE(u.bcbf_code, '') AS bcbf_code,
+                    vr.customer_name,
+                    vr.loan_account_number,
+                    COALESCE(b.name, '') AS branch_name,
+                    cd.outstanding_amount,
+                    cd.interest_overdue,
+                    cd.renewal_due_date,
+                    cd.days_remaining,
+                    cd.kyc_status,
+                    cd.eligible_for_renewal,
+                    cd.sanction_limit,
+                    cd.drawing_power,
+                    cd.agent_observation,
+                    COALESCE(vr.supervisor_name, '') AS supervisor_name,
+                    COALESCE(vr.supervisor_employee_id, '') AS supervisor_bcbf_code
+               FROM visit_reports vr
+               JOIN visit_ckcc_details cd ON cd.visit_report_id = vr.id
+               LEFT JOIN users u ON u.id = vr.agent_id
+               LEFT JOIN branches b ON b.id = vr.branch_id
+              WHERE vr.report_type = 'ckcc_renewal' {$scope} {$dateClause}
+              ORDER BY vr.visit_date DESC, vr.agent_name ASC",
+            array_merge($params, $dateParams)
+        );
+
+        $columns = [
+            ['key' => 'visit_date',          'label' => 'Visit Date',       'type' => 'date',   'width' => 1.1],
+            ['key' => 'agent_name',          'label' => 'BC Supervisor',    'type' => 'text',   'width' => 1.4],
+            ['key' => 'bcbf_code',           'label' => 'BCBF Code',        'type' => 'text',   'width' => 1.0],
+            ['key' => 'customer_name',       'label' => 'Customer',         'type' => 'text',   'width' => 1.5],
+            ['key' => 'loan_account_number', 'label' => 'Loan A/c No.',     'type' => 'text',   'width' => 1.4],
+            ['key' => 'branch_name',         'label' => 'Branch',           'type' => 'text',   'width' => 1.2],
+            ['key' => 'outstanding_amount',  'label' => 'Outstanding',      'type' => 'money',  'width' => 1.2],
+            ['key' => 'interest_overdue',    'label' => 'Interest O/D',     'type' => 'money',  'width' => 1.1],
+            ['key' => 'renewal_due_date',    'label' => 'Renewal Due',      'type' => 'date',   'width' => 1.1],
+            ['key' => 'days_remaining',      'label' => 'Days Left',        'type' => 'number', 'width' => 0.8],
+            ['key' => 'kyc_status',          'label' => 'KYC',              'type' => 'text',   'width' => 0.8],
+            ['key' => 'eligible_for_renewal','label' => 'Eligible',         'type' => 'number', 'width' => 0.8],
+        ];
+
+        $rows = self::castRows($rows, $columns);
+        $totals = self::sumTotals($rows, $columns, 'visit_date', 'TOTAL');
+        if ($totals !== null) {
+            foreach (['agent_name', 'bcbf_code', 'customer_name', 'loan_account_number', 'branch_name', 'renewal_due_date', 'kyc_status'] as $key) {
+                $totals[$key] = '';
+            }
+        }
+
+        $eligible = 0;
+        foreach ($rows as $row) {
+            if ((int) ($row['eligible_for_renewal'] ?? 0) === 1) {
+                $eligible++;
+            }
+        }
+
+        return [
+            'type'     => 'ckcc-od',
+            'title'    => 'CKCC OD Field Report',
+            'subtitle' => self::subtitle($filters, self::rangeLabel($filters)),
+            'columns'  => $columns,
+            'rows'     => $rows,
+            'totals'   => $totals,
+            'summary'  => [
+                ['label' => 'Total reports',      'value' => (string) count($rows)],
+                ['label' => 'Eligible for renewal', 'value' => (string) $eligible],
+                ['label' => 'Outstanding',        'value' => number_format((float) ($totals['outstanding_amount'] ?? 0), 2)],
+                ['label' => 'Interest overdue',   'value' => number_format((float) ($totals['interest_overdue'] ?? 0), 2)],
+            ],
+            'landscape' => true,
+        ];
+    }
+
+    // =======================================================================
+    // 13. CKCC NPA / KRM OTS Field Report
+    // =======================================================================
+
+    /**
+     * NPA accounts under KRM OTS Scheme field verification reports, joined with
+     * visit_ots_details. Completely separate from the existing CKCC renewal report.
+     *
+     * @param array<string,mixed> $filters
+     */
+    private static function ckccNpaKrmReport(array $filters): array
+    {
+        [$scope, $params] = self::scope($filters, 'vr');
+
+        $dateFrom = self::dateOrNull($filters['date_from'] ?? null);
+        $dateTo = self::dateOrNull($filters['date_to'] ?? null);
+
+        $dateClause = '';
+        $dateParams = [];
+        if ($dateFrom !== null) {
+            $dateClause .= ' AND vr.visit_date >= ?';
+            $dateParams[] = $dateFrom;
+        }
+        if ($dateTo !== null) {
+            $dateClause .= ' AND vr.visit_date <= ?';
+            $dateParams[] = $dateTo;
+        }
+
+        $rows = Database::instance()->all(
+            "SELECT vr.visit_date,
+                    vr.agent_name,
+                    COALESCE(u.bcbf_code, '') AS bcbf_code,
+                    vr.customer_name,
+                    vr.loan_account_number,
+                    COALESCE(b.name, '') AS branch_name,
+                    od.npa_date,
+                    od.outstanding_amount,
+                    od.scheme,
+                    od.total_settlement_amount,
+                    od.borrower_payable_amount,
+                    od.deposit_received,
+                    od.approval_status,
+                    od.customer_response,
+                    COALESCE(vr.supervisor_name, '') AS supervisor_name,
+                    COALESCE(vr.supervisor_employee_id, '') AS supervisor_bcbf_code
+               FROM visit_reports vr
+               JOIN visit_ots_details od ON od.visit_report_id = vr.id
+               LEFT JOIN users u ON u.id = vr.agent_id
+               LEFT JOIN branches b ON b.id = vr.branch_id
+              WHERE vr.report_type = 'ots' {$scope} {$dateClause}
+              ORDER BY vr.visit_date DESC, vr.agent_name ASC",
+            array_merge($params, $dateParams)
+        );
+
+        $columns = [
+            ['key' => 'visit_date',              'label' => 'Visit Date',       'type' => 'date',   'width' => 1.1],
+            ['key' => 'agent_name',              'label' => 'BC Supervisor',    'type' => 'text',   'width' => 1.4],
+            ['key' => 'bcbf_code',               'label' => 'BCBF Code',        'type' => 'text',   'width' => 1.0],
+            ['key' => 'customer_name',           'label' => 'Customer',         'type' => 'text',   'width' => 1.5],
+            ['key' => 'loan_account_number',     'label' => 'Loan A/c No.',     'type' => 'text',   'width' => 1.4],
+            ['key' => 'branch_name',             'label' => 'Branch',           'type' => 'text',   'width' => 1.2],
+            ['key' => 'npa_date',                'label' => 'NPA Date',         'type' => 'date',   'width' => 1.1],
+            ['key' => 'outstanding_amount',      'label' => 'Outstanding',      'type' => 'money',  'width' => 1.2],
+            ['key' => 'scheme',                  'label' => 'Scheme',           'type' => 'text',   'width' => 1.0],
+            ['key' => 'total_settlement_amount', 'label' => 'Settlement Amt',   'type' => 'money',  'width' => 1.2],
+            ['key' => 'borrower_payable_amount', 'label' => 'Borrower Payable', 'type' => 'money',  'width' => 1.2],
+            ['key' => 'deposit_received',        'label' => 'Deposit Rcvd',     'type' => 'number', 'width' => 0.9],
+            ['key' => 'approval_status',         'label' => 'Approval',         'type' => 'text',   'width' => 1.0],
+            ['key' => 'customer_response',       'label' => 'Response',         'type' => 'text',   'width' => 1.0],
+        ];
+
+        $rows = self::castRows($rows, $columns);
+        $totals = self::sumTotals($rows, $columns, 'visit_date', 'TOTAL');
+        if ($totals !== null) {
+            foreach (['agent_name', 'bcbf_code', 'customer_name', 'loan_account_number', 'branch_name', 'npa_date', 'scheme', 'approval_status', 'customer_response'] as $key) {
+                $totals[$key] = '';
+            }
+        }
+
+        $approved = 0;
+        $pending = 0;
+        foreach ($rows as $row) {
+            if (($row['approval_status'] ?? '') === 'approved') {
+                $approved++;
+            } elseif (($row['approval_status'] ?? '') === 'pending') {
+                $pending++;
+            }
+        }
+
+        return [
+            'type'     => 'ckcc-npa-krm',
+            'title'    => 'CKCC NPA / KRM OTS Field Report',
+            'subtitle' => self::subtitle($filters, self::rangeLabel($filters)),
+            'columns'  => $columns,
+            'rows'     => $rows,
+            'totals'   => $totals,
+            'summary'  => [
+                ['label' => 'Total reports',      'value' => (string) count($rows)],
+                ['label' => 'Approved',           'value' => (string) $approved],
+                ['label' => 'Pending',            'value' => (string) $pending],
+                ['label' => 'Outstanding',        'value' => number_format((float) ($totals['outstanding_amount'] ?? 0), 2)],
+                ['label' => 'Settlement total',   'value' => number_format((float) ($totals['total_settlement_amount'] ?? 0), 2)],
+            ],
+            'landscape' => true,
+        ];
     }
 
     // =======================================================================

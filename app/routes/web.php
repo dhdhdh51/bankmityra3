@@ -108,6 +108,8 @@ return static function (Router $router): void {
 
     // ---- Reports ---------------------------------------------------------
     $router->get('/reports', [ReportController::class, 'index']);
+    $router->get('/reports/ckcc-od/print/{id}', [ReportController::class, 'printCkccOd']);
+    $router->get('/reports/ckcc-npa-krm/print/{id}', [ReportController::class, 'printCkccNpaKrm']);
     $router->get('/reports/{type}', [ReportController::class, 'show']);
     $router->get('/reports/{type}/export', [ReportController::class, 'export']);
 

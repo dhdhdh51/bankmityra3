@@ -2,21 +2,26 @@
 /** @var array<string,array{label:string,description:string}> $types */
 
 $icons = [
-    'daily'     => 'calendar',
-    'weekly'    => 'calendar',
-    'monthly'   => 'chart',
-    'branch'    => 'branch',
-    'village'   => 'village',
-    'loan-type' => 'money',
-    'agent'     => 'users',
-    'promise'   => 'handshake',
+    'daily'        => 'calendar',
+    'weekly'       => 'calendar',
+    'monthly'      => 'chart',
+    'branch'       => 'branch',
+    'village'      => 'village',
+    'loan-type'    => 'money',
+    'agent'        => 'users',
+    'promise'      => 'handshake',
+    'bc-daily'     => 'calendar',
+    'kcc-renewal'  => 'reports',
+    'od2-renewal'  => 'reports',
+    'ckcc-od'      => 'reports',
+    'ckcc-npa-krm' => 'reports',
 ];
 ?>
 
 <div class="lrms-page-head">
     <div>
         <h1>Reports</h1>
-        <p>Eight report types, each filterable and exportable to Excel, PDF or print</p>
+        <p>All report types, each filterable and exportable to Excel, PDF or print</p>
     </div>
 </div>
 

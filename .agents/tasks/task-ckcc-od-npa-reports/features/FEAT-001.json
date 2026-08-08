@@ -1,0 +1,33 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Add two new report types to ReportService: 'ckcc-od' (CKCC OD Field Report) and 'ckcc-npa-krm' (CKCC NPA Accounts under KRM OTS Scheme Field Report). These are completely separate from the existing CKCC OD-2 renewal report. Each report queries visit_reports joined with visit_ckcc_details and visit_ots_details respectively, filtered by relevant report_type, and returns the standard report shape. Also add dedicated routes and controller methods for separate printable views and dedicated PDF exports for each.",
+  "status": "in_progress",
+  "steps": [
+    "1. Add two new entries to ReportService::TYPES array: 'ckcc-od' => ['label' => 'CKCC OD Field Report', 'description' => 'CKCC OD case field verification reports with supervisor details'] and 'ckcc-npa-krm' => ['label' => 'CKCC NPA / KRM OTS Field Report', 'description' => 'NPA accounts under KRM OTS Scheme field verification reports'].",
+    "2. Add two new private static methods in ReportService.php: ckccOdReport(array $filters) and ckccNpaKrmReport(array $filters). ckccOdReport queries visit_reports vr JOIN visit_ckcc_details cd ON cd.visit_report_id = vr.id, with columns: visit_date, agent_name, bcbf_code (from users table join), customer_name, loan_account_number, branch_name, outstanding_amount, overdue_amount, renewal_due_date, days_remaining, kyc_status, eligible_for_renewal. ckccNpaKrmReport queries visit_reports vr JOIN visit_ots_details od ON od.visit_report_id = vr.id, with columns: visit_date, agent_name, bcbf_code, customer_name, loan_account_number, branch_name, npa_date, outstanding_amount, scheme, total_settlement_amount, borrower_payable_amount, deposit_received, approval_status, customer_response.",
+    "3. Add 'ckcc-od' and 'ckcc-npa-krm' cases to the match() in ReportService::build().",
+    "4. Register new web routes in app/routes/web.php: GET /reports/ckcc-od/print/{id} and GET /reports/ckcc-npa-krm/print/{id} for individual printable report views. The existing /reports/{type} and /reports/{type}/export routes already handle the list views and exports through ReportController.",
+    "5. Create a new controller method in ReportController (or a new CkccReportController) for the printable individual report view. This renders a dedicated print-friendly view for each report type, separate from the existing visit show page. Include Supervisor name and BCBF Code in the header.",
+    "6. Create view files: views/reports/ckcc-od-print.php and views/reports/ckcc-npa-krm-print.php. These are A4-optimized print layouts. No Borrower Signature section. Include Supervisor name and BCBF Code in the header. Use Bootstrap 5 responsive grid. Follow the banking field-report style of the existing visit PDF.",
+    "7. Add schema additions (as a separate migration SQL file at schema-migrations/001-ckcc-od-npa-reports.sql or appended to schema.sql with clear comments): No new tables needed - the existing visit_ckcc_details and visit_ots_details tables already have all required fields. Only need to ensure the bcbf_code is accessible via user joins.",
+    "8. Update views/reports/index.php to include the two new report cards in the grid with appropriate icons."
+  ],
+  "acceptance_criteria": [
+    "ReportService::TYPES contains 'ckcc-od' and 'ckcc-npa-krm' entries",
+    "ReportService::build('ckcc-od', $filters) returns a valid report shape",
+    "ReportService::build('ckcc-npa-krm', $filters) returns a valid report shape",
+    "Routes /reports/ckcc-od and /reports/ckcc-npa-krm are accessible through the existing report controller",
+    "Dedicated printable views exist for both report types",
+    "Supervisor name and BCBF Code appear in report headers",
+    "No Borrower Signature appears in either report",
+    "Running php -l on all new/modified files passes with no syntax errors"
+  ],
+  "verification": [
+    "Run `find /projects/bankmityra3 -name '*.php' -exec php -l {} \\; 2>&1 | grep -i 'error'` and confirm zero errors",
+    "Confirm new report types exist in ReportService::TYPES with `grep -n 'ckcc-od\\|ckcc-npa-krm' /projects/bankmityra3/app/Services/ReportService.php`",
+    "Confirm new view files exist: `ls /projects/bankmityra3/views/reports/ckcc-od-print.php /projects/bankmityra3/views/reports/ckcc-npa-krm-print.php`"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
