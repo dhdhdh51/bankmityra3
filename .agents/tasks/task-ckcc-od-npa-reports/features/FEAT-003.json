@@ -1,0 +1,31 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Responsive UI/dimension improvements across the application. Add responsive container constraints, fix table scrollability on mobile, ensure sticky headers do not cover content, and add print-friendly A4 styling. All done via CSS additions to assets/css/app.css and minimal HTML adjustments in the layout.",
+  "status": "completed",
+  "steps": [
+    "1. In assets/css/app.css, add responsive container width rules: .lrms-content should have max-width: 1200px for desktop panels and proper centering. Add a mobile-specific max-width of 420px for card/form containers where relevant using media queries.",
+    "2. Add table horizontal scroll wrapper styles: .lrms-table-wrap should have overflow-x: auto on screens below 768px so tables scroll horizontally instead of overlapping. Ensure this does not break existing table styling.",
+    "3. Add proper spacing rules: Ensure .lrms-card-body has consistent padding (1rem on mobile, 1.5rem on desktop). Add gap between stacked cards (mb-3 is already used, confirm consistency).",
+    "4. Fix sticky header behavior: Ensure .lrms-topbar does not cover content beneath it - the .lrms-content area should have padding-top that accounts for the topbar height (var(--lrms-topbar-h, 60px)). If a bottom navigation exists, add padding-bottom to prevent content from being hidden.",
+    "5. Add @media print rules for A4-perfect output: Set @page { size: A4; margin: 12mm 10mm; }. Hide .no-print elements. Ensure .lrms-table font size reduces to 8pt for print. Disable background colors except badges. Ensure page-break-inside: avoid on .lrms-card elements.",
+    "6. Ensure Bootstrap 5 responsive grid is being used properly in all new views created in FEAT-001. Verify col-md-*, col-lg-*, col-xl-* breakpoints are correct.",
+    "7. Add responsive form improvements: On mobile (< 576px), form inputs should be full-width. On tablet (576-768px), use 2-column layout. On desktop (> 768px), use the existing multi-column layout.",
+    "8. Ensure printable reports (views/reports/ckcc-od-print.php and views/reports/ckcc-npa-krm-print.php from FEAT-001) have proper A4 print CSS: no clipping, no overlapping, proper margins, and clean banking-style layout."
+  ],
+  "acceptance_criteria": [
+    "assets/css/app.css has @media print rules with @page A4 settings",
+    "Tables are wrapped in overflow-x: auto containers on mobile viewports",
+    "The .lrms-content area respects the topbar height with proper padding-top",
+    "Max-width constraints are defined: 1200px for desktop, 420px for mobile app screens",
+    "No PHP syntax errors in any modified files",
+    "Print-friendly styles do not clip content or cause overlapping on A4 paper"
+  ],
+  "verification": [
+    "Run `find /projects/bankmityra3 -name '*.php' -exec php -l {} \\; 2>&1 | grep -i 'error'` and confirm zero errors",
+    "Run `grep -n '@media print\\|@page\\|max-width.*1200\\|max-width.*420\\|overflow-x' /projects/bankmityra3/assets/css/app.css` to confirm responsive rules are present",
+    "Verify .lrms-table-wrap has overflow-x: auto in the CSS"
+  ],
+  "blocked_reason": null,
+  "findings": "All responsive CSS additions placed at end of assets/css/app.css. The existing base print block remains at line ~971 and is complemented by the new enhanced block at line ~1688. The print views (ckcc-od-print.php, ckcc-npa-krm-print.php) already use Bootstrap grid properly with row/col classes. No PHP changes needed. The sticky topbar fix uses padding-top with CSS calc() referencing the existing --lrms-topbar-h variable."
+}

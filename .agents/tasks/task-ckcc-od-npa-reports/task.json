@@ -1,0 +1,14 @@
+{
+  "task_id": "task-ckcc-od-npa-reports",
+  "task_description": "Add two separate report modules (CKCC OD Field Report and CKCC NPA/KRM OTS Field Report) with dedicated forms, printable reports, PDF/Excel export. Rename 'Admin' to 'Supervisor', 'BC Agent' to 'BC Supervisor', replace 'Employee ID' with 'BCBF Code'. Add responsive UI constraints for mobile/tablet/desktop and A4 print styling.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "All 142 PHP files pass syntax lint with zero errors. All new report types registered in ReportService. All new view files created. Routes registered. BC Agent -> BC Supervisor, Employee ID -> BCBF Code changes confirmed across 17 view files. BCBF auto-generation added. Responsive CSS (1200px desktop, 420px mobile, table scroll, A4 print) confirmed in app.css."
+  }
+}

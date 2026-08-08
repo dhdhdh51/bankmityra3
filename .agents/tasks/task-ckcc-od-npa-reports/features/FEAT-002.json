@@ -1,0 +1,37 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Role and naming changes across the application: Replace 'Admin' with 'Supervisor' in user-facing text, replace 'BC Agent' with 'BC Supervisor' in user-facing text, remove 'Employee ID' label references and replace with 'BCBF Code' throughout all views, reports, and PDF output. Also ensure BCBF Code auto-generation when creating a staff member. This is a global text replacement across views, controllers, and the PDF builder.",
+  "status": "completed",
+  "steps": [
+    "1. In views/users/form.php: Change 'Employee code' label to 'BCBF Code' (the login identifier field). Change help text 'This is the login identifier.' to 'BCBF Code - used as the login identifier.' Change placeholder from 'e.g. AGT001' to show BCBF format. Change 'Create a branch manager or BC agent account' to 'Create a branch manager or BC Supervisor account'.",
+    "2. In views/users/index.php: Change column header 'Employee code' to 'BCBF Code'. Change empty-state message referencing 'BC agent accounts' to 'BC Supervisor accounts'.",
+    "3. In views/visits/show.php: Change 'BC agent / DRA name' to 'BC Supervisor / DRA name'. Change 'BC agent observation' to 'BC Supervisor observation'. Change 'BC agent / DRA observations' heading to 'BC Supervisor / DRA observations'. Change 'BC agent recommendation' to 'BC Supervisor recommendation'.",
+    "4. In app/Controllers/Admin/VisitController.php PDF section: Change all 'BC Agent' references to 'BC Supervisor'. Change 'BC Agent / DRA Name' to 'BC Supervisor / DRA Name'. Change 'BC Agent / DRA Signature' to 'BC Supervisor / DRA Signature'. Change section 8 title 'BC Agent / DRA Observations' to 'BC Supervisor / DRA Observations'. Change 'Employee ID / DRA ID' to 'BCBF Code / DRA ID' in the supervisor verification section.",
+    "5. In views/layouts/app.php: Change nav label 'Managers & Agents' to 'Managers & Supervisors'.",
+    "6. In views/auth/forgot-password.php: Change 'Super Admin' to 'Supervisor' where appropriate (note: 'Super Admin' is a system role slug - only change user-facing display text, not the role slug or internal references).",
+    "7. In app/Controllers/Admin/UserController.php: Update the index title from 'Managers & Agents' to 'Managers & Supervisors'. Keep internal role slugs unchanged.",
+    "8. Add BCBF Code auto-generation logic in the User model or UserController::create() method: When creating a new staff member, if bcbf_code is not provided, auto-generate one in format 'BCBF' + branch_code + sequential number (e.g., BCBF-BR001-0001). Look for the pattern in the existing employee_code generation or use a similar approach.",
+    "9. Ensure the VisitReport::CORRECTABLE array's 'supervisor_employee_id' label changes from 'Supervisor employee / DRA ID' to 'Supervisor BCBF Code / DRA ID' in app/Models/VisitReport.php.",
+    "10. Update the DECLARATION constant text in VisitReport.php: Replace 'BC agent / DRA' mentions with 'BC Supervisor / DRA' if they exist there.",
+    "11. In views/auth/login.php: Change 'Employee code or email' label to 'BCBF Code or email'. Change placeholder 'e.g. ADMIN001' to a BCBF-style placeholder."
+  ],
+  "acceptance_criteria": [
+    "No view file contains 'BC Agent' (case-sensitive) in user-facing text - all replaced with 'BC Supervisor'",
+    "No view file shows 'Employee ID' as a visible label - replaced with 'BCBF Code'",
+    "Login page shows 'BCBF Code' instead of 'Employee code'",
+    "PDF output uses 'BC Supervisor' instead of 'BC Agent' in all sections",
+    "BCBF Code auto-generation works when creating users without providing one",
+    "Supervisor verification section in PDF shows 'BCBF Code / DRA ID' instead of 'Employee ID / DRA ID'",
+    "No PHP syntax errors in any modified file",
+    "Internal role slugs (super_admin, agent, etc.) remain unchanged"
+  ],
+  "verification": [
+    "Run `find /projects/bankmityra3 -name '*.php' -exec php -l {} \\; 2>&1 | grep -i 'error'` and confirm zero errors",
+    "Run `grep -rn 'BC Agent' /projects/bankmityra3/views/ /projects/bankmityra3/app/Controllers/` to confirm no remaining 'BC Agent' in user-facing text (some may remain in comments which is acceptable)",
+    "Run `grep -n 'Employee ID' /projects/bankmityra3/views/` to confirm no remaining 'Employee ID' labels",
+    "Confirm BCBF auto-generation logic exists: `grep -n 'BCBF' /projects/bankmityra3/app/Controllers/Admin/UserController.php /projects/bankmityra3/app/Models/User.php`"
+  ],
+  "blocked_reason": null,
+  "findings": "All user-facing BC Agent references changed to BC Supervisor. Employee ID/Employee code labels changed to BCBF Code. BCBF auto-generation added in User::generateBcbfCode(). Additional user-facing references found in customers/show.php, dashboard/index.php, bc/scorecard.php, branches/index.php, visits/index.php, layouts/auth.php, NotificationController.php were also updated. Internal code comments left unchanged. Super Admin role name kept as-is in forgot-password.php."
+}
