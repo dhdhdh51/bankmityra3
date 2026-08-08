@@ -5,19 +5,19 @@
  */
 ?>
 <h2>Sign in</h2>
-<p class="sub">Enter your employee code and password to continue.</p>
+<p class="sub">Enter your BCBF Code and password to continue.</p>
 
 <form method="post" action="<?= e(url('/login')) ?>" novalidate data-no-double-submit>
     <?= csrf_field() ?>
 
     <div class="mb-3">
-        <label class="form-label" for="employee_code">Employee code or email <span class="req">*</span></label>
+        <label class="form-label" for="employee_code">BCBF Code or email <span class="req">*</span></label>
         <input type="text"
                class="form-control<?= has_error($errors, 'employee_code') ?>"
                id="employee_code"
                name="employee_code"
                value="<?= old($old, 'employee_code') ?>"
-               placeholder="e.g. ADMIN001"
+               placeholder="e.g. BCBF0001"
                autocomplete="username"
                autocapitalize="characters"
                spellcheck="false"

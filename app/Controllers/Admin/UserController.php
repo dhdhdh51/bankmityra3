@@ -36,7 +36,7 @@ final class UserController extends Controller
         );
 
         $this->view($request, 'users/index', [
-            'title'    => 'Managers & Agents',
+            'title'    => 'Managers & Supervisors',
             'users'    => $users,
             'roles'    => User::roleOptions(Auth::isSuperAdmin()),
             'branches' => Branch::options($scoped),
@@ -84,6 +84,13 @@ final class UserController extends Controller
             $password = $this->suggestPassword();
         }
 
+        $bcExtra = $this->bcExtraDetails($request);
+
+        // Auto-generate BCBF Code if not provided when creating a staff member.
+        if (empty($bcExtra['bcbf_code'])) {
+            $bcExtra['bcbf_code'] = User::generateBcbfCode();
+        }
+
         $data = [
             'employee_code'        => strtoupper($request->str('employee_code')),
             'name'                => $request->str('name'),
@@ -96,7 +103,7 @@ final class UserController extends Controller
             // New accounts must change the password given to them at first login.
             'must_change_password' => 1,
             'created_by'          => Auth::id(),
-        ] + $this->bcExtraDetails($request);
+        ] + $bcExtra;
 
         $id = User::create($data, $password, $request->nullableStr('mobile'));
 
@@ -315,7 +322,7 @@ final class UserController extends Controller
         }
 
         return Validator::make($request->all(), $rules, [
-            'employee_code' => 'Employee code',
+            'employee_code' => 'BCBF Code',
             'role_id'       => 'Role',
             'bc_code'       => 'BC code',
             'sp_cbc_name'   => 'SP / CBC Name',

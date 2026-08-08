@@ -520,9 +520,9 @@ final class VisitReport
         'state'                      => 'State',
         'pin_code'                   => 'PIN code',
         'cif_number'                 => 'CIF number',
-        'agent_mobile'               => 'BC agent / DRA mobile',
+        'agent_mobile'               => 'BC Supervisor / DRA mobile',
         'supervisor_designation'     => 'Supervisor designation',
-        'supervisor_employee_id'     => 'Supervisor employee / DRA ID',
+        'supervisor_employee_id'     => 'Supervisor BCBF Code / DRA ID',
     ];
 
     /**

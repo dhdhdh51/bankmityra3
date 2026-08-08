@@ -236,7 +236,7 @@ $revisionCount = (int) ($report['revision_count'] ?? 0);
                     <div><dt>Regional office</dt><dd><?= nullable($report['regional_office']) ?></dd></div>
                     <div><dt>Zone</dt><dd><?= nullable($report['zone']) ?></dd></div>
                     <div><dt>SP / CBC name</dt><dd><?= nullable($report['sp_cbc_name']) ?></dd></div>
-                    <div><dt>BC agent / DRA name</dt><dd><?= e($report['agent_name']) ?></dd></div>
+                    <div><dt>BC Supervisor / DRA name</dt><dd><?= e($report['agent_name']) ?></dd></div>
                     <div><dt>BC code / DRA ID</dt><dd><?= nullable($report['bc_code']) ?></dd></div>
                     <div><dt>Linked branch</dt><dd><?= nullable($report['linked_branch']) ?></dd></div>
                     <div><dt>District</dt><dd><?= nullable($report['district']) ?></dd></div>
@@ -590,11 +590,11 @@ $revisionCount = (int) ($report['revision_count'] ?? 0);
                     <?= $flagBlock(VisitReport::CKCC_CONSENT_FLAGS, $ckcc) ?>
 
                     <?php if (!empty($ckcc['agent_observation'])): ?>
-                        <h3 class="lrms-subhead mt-4">BC agent observation</h3>
+                        <h3 class="lrms-subhead mt-4">BC Supervisor observation</h3>
                         <p class="lrms-prose"><?= nl2br(e($ckcc['agent_observation'])) ?></p>
                     <?php endif; ?>
 
-                    <h3 class="lrms-subhead mt-4">BC agent recommendation</h3>
+                    <h3 class="lrms-subhead mt-4">BC Supervisor recommendation</h3>
                     <?= $flagBlock(VisitReport::CKCC_RECOMMENDATION_FLAGS, $ckcc) ?>
                     <?php if (!empty($ckcc['rec_other_text'])): ?>
                         <p class="text-muted mt-2">Other: <?= e($ckcc['rec_other_text']) ?></p>
@@ -608,7 +608,7 @@ $revisionCount = (int) ($report['revision_count'] ?? 0);
 
         <!-- Recovery possibility -->
         <div class="lrms-card mb-3">
-            <div class="lrms-card-head"><h2>8. BC agent / DRA observations</h2><p>What the agent found out about payment</p></div>
+            <div class="lrms-card-head"><h2>8. BC Supervisor / DRA observations</h2><p>What the agent found out about payment</p></div>
             <div class="lrms-card-body">
                 <?= $flagBlock(VisitReport::RECOVERY_FLAGS, $report) ?>
 
@@ -721,7 +721,7 @@ $revisionCount = (int) ($report['revision_count'] ?? 0);
                 <p>Signed by hand on the printed copy</p>
             </div>
             <div class="lrms-card-body">
-                <h3 class="lrms-subhead">BC agent / DRA</h3>
+                <h3 class="lrms-subhead">BC Supervisor / DRA</h3>
                 <dl class="lrms-dl">
                     <div><dt>Name</dt><dd><?= e($report['agent_name']) ?></dd></div>
                     <div><dt>BC code / DRA ID</dt><dd><?= nullable($report['bc_code']) ?></dd></div>
@@ -732,7 +732,7 @@ $revisionCount = (int) ($report['revision_count'] ?? 0);
                 <dl class="lrms-dl">
                     <div><dt>Name</dt><dd><?= nullable($report['supervisor_name']) ?></dd></div>
                     <div><dt>Designation</dt><dd><?= nullable($report['supervisor_designation']) ?></dd></div>
-                    <div><dt>Employee ID / DRA ID</dt><dd><?= nullable($report['supervisor_employee_id']) ?></dd></div>
+                    <div><dt>BCBF Code / DRA ID</dt><dd><?= nullable($report['supervisor_employee_id']) ?></dd></div>
                     <div>
                         <dt>Verified on</dt>
                         <dd><?= empty($report['supervisor_verified_at']) ? '<span class="text-muted">&mdash;</span>' : e(fmt_date((string) $report['supervisor_verified_at'])) ?></dd>
@@ -774,7 +774,7 @@ $revisionCount = (int) ($report['revision_count'] ?? 0);
             <div class="lrms-card-body">
                 <p class="text-muted mb-0" style="font-size:.8125rem">
                     Nothing is signed on a screen. <strong>Print this report</strong> &mdash; it
-                    carries empty boxes for the <strong>BC agent&nbsp;/&nbsp;DRA</strong> and the
+                    carries empty boxes for the <strong>BC Supervisor&nbsp;/&nbsp;DRA</strong> and the
                     <strong>supervisor</strong>, to be signed by hand on the paper, which is what
                     section&nbsp;12 of the form asks for.
                 </p>

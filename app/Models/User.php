@@ -154,6 +154,31 @@ final class User
         return Database::instance()->insert('users', $data);
     }
 
+    /**
+     * Generates the next available BCBF Code in the format BCBF + 4-digit sequential number.
+     * Example: BCBF0001, BCBF0002, etc.
+     */
+    public static function generateBcbfCode(): string
+    {
+        $db = Database::instance();
+
+        // Find the highest existing BCBF code that matches the pattern BCBFnnnn.
+        $last = $db->scalar(
+            "SELECT bcbf_code FROM users WHERE bcbf_code LIKE 'BCBF%' ORDER BY bcbf_code DESC LIMIT 1"
+        );
+
+        $nextNumber = 1;
+        if ($last !== null && $last !== false) {
+            // Extract the numeric portion after 'BCBF'
+            $numericPart = substr((string) $last, 4);
+            if (is_numeric($numericPart)) {
+                $nextNumber = ((int) $numericPart) + 1;
+            }
+        }
+
+        return 'BCBF' . str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
+    }
+
     /** @param array<string,mixed> $data */
     public static function update(int $id, array $data, ?string $plainMobile = null, bool $touchMobile = false): void
     {

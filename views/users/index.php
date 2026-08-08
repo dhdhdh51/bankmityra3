@@ -11,7 +11,7 @@
 
 <div class="lrms-page-head">
     <div>
-        <h1>Managers &amp; Agents</h1>
+        <h1>Managers &amp; Supervisors</h1>
         <p>User accounts, roles, branch assignment and password resets</p>
     </div>
     <?php if (can('users.create')): ?>
@@ -91,7 +91,7 @@
     <?php if ($users->isEmpty()): ?>
         <?= \App\Core\View::partial('partials/empty', [
             'heading'     => 'No users found',
-            'message'     => 'Create branch managers and BC agent accounts to start assigning leads.',
+            'message'     => 'Create branch managers and BC Supervisor accounts to start assigning leads.',
             'iconName'    => 'users',
             'actionLabel' => can('users.create') ? 'Add user' : null,
             'actionUrl'   => can('users.create') ? url('/users/create') : null,
@@ -101,7 +101,7 @@
             <table class="lrms-table">
                 <thead>
                     <tr>
-                        <th><?= sort_link('Employee code', 'employee_code', $sortBy, $sortDir) ?></th>
+                        <th><?= sort_link('BCBF Code', 'employee_code', $sortBy, $sortDir) ?></th>
                         <th><?= sort_link('Name', 'name', $sortBy, $sortDir) ?></th>
                         <th>Role</th>
                         <th>Branch</th>

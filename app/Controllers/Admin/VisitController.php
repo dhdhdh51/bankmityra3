@@ -386,7 +386,7 @@ final class VisitController extends Controller
             'Regional Office'     => $report['regional_office'],
             'Zone'                => $report['zone'],
             'SP / CBC Name'       => $report['sp_cbc_name'],
-            'BC Agent / DRA Name' => $report['agent_name'],
+            'BC Supervisor / DRA Name' => $report['agent_name'],
             'BC Code / DRA ID'    => $report['bc_code'],
             'Linked Branch'       => $report['linked_branch'],
             'District'            => $report['district'],
@@ -658,7 +658,7 @@ final class VisitController extends Controller
         // numbered band. The form has thirteen sections and this system has to print
         // those thirteen if the paper copy is to match, so the recovery findings go where
         // a reader looks for what the agent learned - which is what they are.
-        $pdf->sectionBand(8, 'BC Agent / DRA Observations');
+        $pdf->sectionBand(8, 'BC Supervisor / DRA Observations');
 
         $pdf->groupLabel('Recovery Possibility');
         $pdf->checkboxGrid(self::pdfFlags(VisitReport::RECOVERY_FLAGS, $report), 4);
@@ -787,7 +787,7 @@ final class VisitController extends Controller
         // app that never showed the tick box must not be printed as though it had.
         $pdf->paragraph(
             (int) ($report['declaration_accepted'] ?? 0) === 1
-                ? 'The BC agent / DRA accepted this declaration when submitting the report.'
+                ? 'The BC Supervisor / DRA accepted this declaration when submitting the report.'
                 : 'This report was submitted without the declaration being accepted in the app.',
             8.2,
             (int) ($report['declaration_accepted'] ?? 0) === 1 ? '#0f766e' : '#8a5a00'
@@ -800,7 +800,7 @@ final class VisitController extends Controller
         $agentIdentity = (string) $report['agent_name']
             . "\n" . (string) ($report['bc_code'] ?? $agent['employee_code'] ?? '');
 
-        $pdf->groupLabel('BC Agent / DRA');
+        $pdf->groupLabel('BC Supervisor / DRA');
         $pdf->formFields([
             'Name'             => $report['agent_name'],
             'BC Code / DRA ID' => $report['bc_code'] ?? ($agent['employee_code'] ?? null),
@@ -815,7 +815,7 @@ final class VisitController extends Controller
         if ($agentPhoto !== null) {
             $pdf->imageStrip([[
                 'path'    => Uploader::absolutePath((string) $agentPhoto['file_path']),
-                'label'   => 'BC Agent (at the visit)',
+                'label'   => 'BC Supervisor (at the visit)',
                 'caption' => $agentIdentity . "\n" . Geo::photo($agentPhoto),
             ]], 96.0);
         } else {
@@ -841,7 +841,7 @@ final class VisitController extends Controller
         // nothing and invites the opposite habit - signing the paper and never recording
         // the decision, which leaves the approval nowhere a report can be listed by.
         $pdf->signatureBlock([[
-            'label'   => 'BC Agent / DRA Signature',
+            'label'   => 'BC Supervisor / DRA Signature',
             'caption' => $agentIdentity . "\nDate:",
         ]], 60.0, 16.0, 2);
 
@@ -849,7 +849,7 @@ final class VisitController extends Controller
         $pdf->formFields([
             'Name'                  => $report['supervisor_name'],
             'Designation'           => $report['supervisor_designation'],
-            'Employee ID / DRA ID'  => $report['supervisor_employee_id'],
+            'BCBF Code / DRA ID'    => $report['supervisor_employee_id'],
         ], 3);
         $pdf->ruledFields([
             'Verified On' => $report['supervisor_verified_at'] === null
@@ -1154,7 +1154,7 @@ final class VisitController extends Controller
             'aadhaar'      => 'Aadhaar',
             'passbook'     => 'Passbook',
             'renewal_form' => 'Renewal Form',
-            'agent'        => 'BC Agent',
+            'agent'        => 'BC Supervisor',
             'other'        => 'Other',
         ][$photoType] ?? ucwords(str_replace('_', ' ', $photoType));
     }

@@ -14,7 +14,7 @@
         <div>
             The SMS gateway is not configured yet, so OTP delivery is unavailable.
             Ask your Super Admin to reset your password from
-            <strong>Managers &amp; Agents</strong>.
+            <strong>Managers &amp; Supervisors</strong>.
         </div>
     </div>
 <?php endif; ?>
@@ -23,7 +23,7 @@
     <?= csrf_field() ?>
 
     <div class="mb-3">
-        <label class="form-label" for="employee_code">Employee code or registered mobile <span class="req">*</span></label>
+        <label class="form-label" for="employee_code">BCBF Code or registered mobile <span class="req">*</span></label>
         <input type="text"
                class="form-control<?= has_error($errors, 'employee_code') ?>"
                id="employee_code"
@@ -34,7 +34,7 @@
                required
                autofocus>
         <?= field_error($errors, 'employee_code') ?>
-        <div class="form-text">Enter the same code you use to sign in.</div>
+        <div class="form-text">Enter the same BCBF Code you use to sign in.</div>
     </div>
 
     <button type="submit" class="btn btn-primary w-100">

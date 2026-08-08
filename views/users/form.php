@@ -29,7 +29,7 @@ $currentBranchId = (string) ($old['branch_id'] ?? ($user['branch_id'] ?? ''));
 <div class="lrms-page-head">
     <div>
         <nav aria-label="Breadcrumb" class="mb-1" style="font-size:.75rem">
-            <a href="<?= e(url('/users')) ?>" class="text-muted">Managers &amp; Agents</a>
+            <a href="<?= e(url('/users')) ?>" class="text-muted">Managers &amp; Supervisors</a>
             <span class="text-muted mx-1">/</span>
             <span class="text-muted"><?= $isEdit ? 'Edit' : 'New' ?></span>
         </nav>
@@ -37,7 +37,7 @@ $currentBranchId = (string) ($old['branch_id'] ?? ($user['branch_id'] ?? ''));
         <p>
             <?= $isEdit
                 ? e((string) $user['name']) . ' · ' . e((string) $user['employee_code'])
-                : 'Create a branch manager or BC agent account' ?>
+                : 'Create a branch manager or BC Supervisor account' ?>
         </p>
     </div>
 </div>
@@ -52,12 +52,12 @@ $currentBranchId = (string) ($old['branch_id'] ?? ($user['branch_id'] ?? ''));
                 <div class="lrms-card-body">
                     <div class="row g-3">
                         <div class="col-md-5">
-                            <label class="form-label" for="employee_code">Employee code <span class="req">*</span></label>
+                            <label class="form-label" for="employee_code">BCBF Code <span class="req">*</span></label>
                             <input type="text" class="form-control text-uppercase<?= has_error($errors, 'employee_code') ?>"
                                    id="employee_code" name="employee_code" value="<?= $value('employee_code') ?>"
-                                   maxlength="40" required autofocus spellcheck="false" placeholder="e.g. AGT001">
+                                   maxlength="40" required autofocus spellcheck="false" placeholder="e.g. BCBF0001">
                             <?= field_error($errors, 'employee_code') ?>
-                            <div class="form-text">This is the login identifier.</div>
+                            <div class="form-text">BCBF Code - used as the login identifier.</div>
                         </div>
 
                         <div class="col-md-7">
@@ -103,7 +103,7 @@ $currentBranchId = (string) ($old['branch_id'] ?? ($user['branch_id'] ?? ''));
                                 <?php endforeach; ?>
                             </select>
                             <?= field_error($errors, 'role_id') ?>
-                            <div class="form-text">BC Agents sign in through the Android app only.</div>
+                            <div class="form-text">BC Supervisors sign in through the Android app only.</div>
                         </div>
 
                         <?php if (count($branches) > 1): ?>
@@ -129,7 +129,7 @@ $currentBranchId = (string) ($old['branch_id'] ?? ($user['branch_id'] ?? ''));
                             <input type="text" class="form-control<?= has_error($errors, 'bc_code') ?>"
                                    id="bc_code" name="bc_code" value="<?= $value('bc_code') ?>" maxlength="40">
                             <?= field_error($errors, 'bc_code') ?>
-                            <div class="form-text">Printed on the agent's field visit reports.</div>
+                            <div class="form-text">Printed on the supervisor's field visit reports.</div>
                         </div>
 
                         <div class="col-md-6">
@@ -155,7 +155,7 @@ $currentBranchId = (string) ($old['branch_id'] ?? ($user['branch_id'] ?? ''));
                 <div class="lrms-card-head">
                     <div>
                         <h2>BC Basic Details</h2>
-                        <p>The bank's reporting hierarchy and the agent's registration numbers</p>
+                        <p>The bank's reporting hierarchy and the supervisor's registration numbers</p>
                     </div>
                 </div>
                 <div class="lrms-card-body">
@@ -254,7 +254,7 @@ $currentBranchId = (string) ($old['branch_id'] ?? ($user['branch_id'] ?? ''));
                 <div class="lrms-card-head">
                     <div>
                         <h2>Address Details</h2>
-                        <p>The agent's own residential address</p>
+                        <p>The supervisor's own residential address</p>
                     </div>
                 </div>
                 <div class="lrms-card-body">
