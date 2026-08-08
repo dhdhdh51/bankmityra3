@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Add CKCC OD Field Report as a new separate report type. This creates a dedicated form for CKCC OD (Overdraft) cases, distinct from the existing CKCC OD-2 renewal report. No Borrower Signature field. Includes all relevant CKCC account data fields plus OD-specific fields.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "1. In VisitFormData.kt companion object, add new constant REPORT_CKCC_OD = \"ckcc_od\" and add it to REPORT_TYPES list as (REPORT_CKCC_OD to \"CKCC OD Field Report\") after the CKCC entry.",
     "2. In VisitFormData.kt, add new fields for the CKCC OD report section, prefixed with 'ckccOd'. Fields: ckccOdCifNumber, ckccOdSanctionDate, ckccOdSanctionLimit, ckccOdDrawingPower, ckccOdOutstanding, ckccOdInterestOverdue, ckccOdOdLimit, ckccOdOdUtilization, ckccOdLastCreditDate, ckccOdEligibleForRenewal (Boolean), ckccOdKycComplete (Boolean), ckccOdAadhaarSeeded (Boolean), ckccOdMobileLinked (Boolean), ckccOdAadhaarAuth (Boolean), ckccOdWillingToRenew (Boolean), ckccOdDocumentsHandedOver (Boolean), ckccOdRenewalFormSigned (Boolean), ckccOdEkycCompleted (Boolean), ckccOdBiometricsCompleted (Boolean), ckccOdObservation (String), ckccOdRecRenewImmediately (Boolean), ckccOdRecDocumentsSubmitted (Boolean), ckccOdRecPendingDocuments (Boolean), ckccOdRecFollowupRequired (Boolean), ckccOdRecNotInterested (Boolean), ckccOdRecBranchContactUrgent (Boolean), ckccOdRecOthers (Boolean), ckccOdRecOtherText (String), ckccOdStCustomerContacted (Boolean), ckccOdStCustomerVerified (Boolean), ckccOdStDocumentsCollected (Boolean), ckccOdStApplicationSubmitted (Boolean), ckccOdStRenewed (Boolean), ckccOdStPendingAtBranch (Boolean), ckccOdStFollowupRequired (Boolean), ckccOdStBecameNpa (Boolean).",
@@ -31,5 +31,5 @@
     "cd /projects/bankmityra3/android && ./gradlew --no-daemon assembleDebug"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Build requires JAVA_HOME=/opt/toolchains/.local/share/mise/installs/java/17.0.2. Android SDK was not pre-installed; created minimal sdk dir at /root/android-sdk with license acceptance. local.properties points to it. Also needed --no-configuration-cache due to Java version mismatch with config cache. ApiContractTest had a hard-coded assertion on REPORT_TYPES count/order that needed updating along with its JSON fixture."
 }

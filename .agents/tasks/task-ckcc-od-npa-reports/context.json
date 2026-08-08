@@ -1,0 +1,27 @@
+{
+  "project_type": "Kotlin Android app with ViewBinding, XML layouts, Retrofit, Coroutines",
+  "language": "Kotlin",
+  "build_system": "Gradle with Kotlin DSL (build.gradle.kts), JAVA_HOME=/opt/toolchains/.local/share/mise/installs/java/17.0.2",
+  "test_framework": "JUnit 4 with Robolectric and MockWebServer, tests in android/app/src/test/",
+  "build_command": "cd /projects/bankmityra3/android && JAVA_HOME=/opt/toolchains/.local/share/mise/installs/java/17.0.2 ./gradlew --no-daemon assembleDebug",
+  "test_command": "cd /projects/bankmityra3/android && JAVA_HOME=/opt/toolchains/.local/share/mise/installs/java/17.0.2 ./gradlew --no-daemon testDebugUnitTest",
+  "verification_instructions": "Run assembleDebug to verify build, run testDebugUnitTest to verify tests. All changes in android/ folder only.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "JAVA_HOME must be set to /opt/toolchains/.local/share/mise/installs/java/17.0.2. Android SDK dir at /root/android-sdk. local.properties already points to it.",
+  "environment_constraints": "INTEGRATIONS_ONLY network - cannot download new packages. All dependencies already configured. No Docker daemon available.",
+  "contribution_requirements": "All changes must be within the android/ folder. Do NOT modify existing CKCC, OTS, or other report layouts. This is an ADD-ON only.",
+  "key_patterns": "ViewBinding used for all Activities. Form sections use MaterialCardView with accent strip. Partial layouts included via <include>. VisitFormData is a single class (no longer data class due to JVM 255 limit) holding all form fields with toFieldMap() serialization and validate() method. VisitReportActivity has setUp* methods per section. Constants in companion object.",
+  "relevant_files": [
+    "android/app/src/main/java/com/lrms/recovery/domain/VisitFormData.kt",
+    "android/app/src/main/java/com/lrms/recovery/ui/visit/VisitReportActivity.kt",
+    "android/app/src/main/java/com/lrms/recovery/ui/visit/VisitDetailActivity.kt",
+    "android/app/src/main/java/com/lrms/recovery/util/Formatters.kt",
+    "android/app/src/main/res/layout/activity_visit_report.xml",
+    "android/app/src/main/res/layout/partial_visit_npa_ots.xml",
+    "android/app/src/main/res/layout/partial_visit_ckcc_od.xml",
+    "android/app/src/main/res/values/strings.xml",
+    "android/app/src/main/AndroidManifest.xml",
+    "android/app/src/test/java/com/lrms/recovery/domain/VisitFormDataTest.kt"
+  ],
+  "directory_structure": "android/app/src/main/java/com/lrms/recovery/ has: data/ (ApiClient, ApiService, Dto), domain/ (VisitFormData), ui/ (visit/, customer/, main/, login/, etc), util/ (Formatters, FileStore, AppLanguage), location/, reminder/. Layouts in res/layout/, strings in res/values/strings.xml."
+}

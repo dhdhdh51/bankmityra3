@@ -1,0 +1,14 @@
+{
+  "task_id": "task-ckcc-od-npa-reports",
+  "task_description": "Complete implementation of CKCC NPA KRM OTS Field Report: fix data class JVM limit issue, add ReportGenerator for A4 HTML/PDF, create ReportViewActivity with Print/PDF/Excel buttons, apply BC Agent->BC Supervisor and Employee ID->BCBF Code renaming, ensure build and tests pass.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-004", "FEAT-003", "FEAT-005", "FEAT-006"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "BUILD SUCCESSFUL. 303 unit tests pass with 0 failures. All features implemented: NPA OTS form (FEAT-001,002), ClassFormatError fix (FEAT-004), naming changes (FEAT-003), ReportGenerator with 18 tests (FEAT-005), ReportViewActivity + ExcelExporter with 10 tests (FEAT-006)."
+  }
+}

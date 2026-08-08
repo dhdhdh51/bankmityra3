@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Add CKCC NPA Accounts under KRM OTS Scheme Field Report as a new separate report type. This creates a dedicated form for NPA accounts being handled under the KRM OTS scheme. Combines NPA account details with OTS settlement fields. No Borrower Signature.",
+  "status": "completed",
+  "steps": [
+    "1. In VisitFormData.kt companion object, add new constant REPORT_CKCC_NPA_OTS = \"ckcc_npa_ots\" and add it to REPORT_TYPES list.",
+    "2. In VisitFormData.kt, add new fields for the CKCC NPA OTS report section, prefixed with 'npaOts'.",
+    "3. In VisitFormData.kt, add validateCkccNpaOts() method.",
+    "4. In VisitFormData.kt toFieldMap(), add block for REPORT_CKCC_NPA_OTS.",
+    "5. Create partial_visit_npa_ots.xml layout.",
+    "6. In activity_visit_report.xml, add include for npa_ots section.",
+    "7. In VisitReportActivity.kt, add setUpNpaOts() and toggle visibility in applyReportType().",
+    "8. Add NPA OTS string resources to strings.xml."
+  ],
+  "acceptance_criteria": [
+    "The report type dropdown shows 'CKCC NPA - KRM OTS Scheme' as an option",
+    "Selecting it shows the NPA OTS partial layout with all required sections",
+    "All NPA OTS fields are serialized to the field map under 'npa_ots_details[...]' prefix",
+    "No Borrower Signature field exists in this form",
+    "./gradlew assembleDebug passes"
+  ],
+  "verification": [
+    "cd /projects/bankmityra3/android && ./gradlew --no-daemon assembleDebug"
+  ],
+  "blocked_reason": null,
+  "findings": "All code is in place and build passes. The NPA OTS form layout, data model fields, validation, serialization, and activity wiring are all complete."
+}
