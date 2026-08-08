@@ -407,6 +407,13 @@ class VisitFormData(
      * This replaces the compiler-generated data-class copy(), which is not available
      * because the constructor exceeds the JVM 255-parameter limit. Only the fields
      * that tests or callers actually override are exposed as parameters here.
+     *
+     * WARNING - MAINTENANCE REQUIRED:
+     * When you add a new field to this class, you MUST also:
+     *   1. Add a `clone.newField = this.newField` line in the body below.
+     *   2. If tests need to override it, add it as a parameter to this method.
+     * There is no compiler enforcement. Forgetting step 1 means copy() silently
+     * drops the field's value, and tests that use copy() will pass on stale data.
      */
     fun copy(
         visitDate: String = this.visitDate,

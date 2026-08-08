@@ -2,6 +2,7 @@ package com.lrms.recovery.report
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.print.PrintManager
 import android.webkit.WebView
@@ -32,9 +33,14 @@ class ReportViewActivity : BaseActivity() {
 
         htmlContent = intent.getStringExtra(EXTRA_HTML_CONTENT).orEmpty()
 
-        @Suppress("UNCHECKED_CAST")
-        formFields = (intent.getSerializableExtra(EXTRA_FORM_FIELDS) as? HashMap<String, String>)
-            ?: hashMapOf()
+        @Suppress("UNCHECKED_CAST", "DEPRECATION")
+        formFields = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getSerializableExtra(EXTRA_FORM_FIELDS, HashMap::class.java) as? HashMap<String, String>
+                ?: hashMapOf()
+        } else {
+            (intent.getSerializableExtra(EXTRA_FORM_FIELDS) as? HashMap<String, String>)
+                ?: hashMapOf()
+        }
 
         setupWebView()
         setupButtons()
@@ -54,8 +60,7 @@ class ReportViewActivity : BaseActivity() {
     }
 
     private fun setupButtons() {
-        binding.buttonPrint.setOnClickListener { printReport() }
-        binding.buttonPdf.setOnClickListener { printReport() } // PDF via print dialog
+        binding.buttonPrintPdf.setOnClickListener { printReport() }
         binding.buttonExcel.setOnClickListener { exportExcel() }
     }
 

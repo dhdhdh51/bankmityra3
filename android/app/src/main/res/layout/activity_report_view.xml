@@ -34,26 +34,14 @@
             android:gravity="center">
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonPrint"
+                android:id="@+id/buttonPrintPdf"
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginEnd="4dp"
-                android:text="@string/report_print"
+                android:text="@string/report_print_pdf"
                 app:icon="@drawable/ic_print"
-                app:iconGravity="textStart" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonPdf"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="4dp"
-                android:text="@string/report_save_pdf"
-                app:icon="@drawable/ic_download"
                 app:iconGravity="textStart" />
 
             <com.google.android.material.button.MaterialButton

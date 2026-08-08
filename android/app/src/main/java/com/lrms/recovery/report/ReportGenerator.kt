@@ -324,20 +324,14 @@ th {
         val deposit = if (isNpaOts) form.npaOtsRequiredDeposit else form.otsRequiredDeposit
         val customerResponse = if (isNpaOts) form.npaOtsBorrowerResponse else form.otsCustomerResponse
 
-        // KYC and renewal fields (from NPA OTS or main CKCC fields)
-        val kycComplete = if (isNpaOts) false else form.ckccKycComplete
-        val aadhaarSeeded = if (isNpaOts) false else form.ckccAadhaarSeeded
-        val mobileLinked = if (isNpaOts) false else form.ckccMobileLinked
-        val aadhaarAuth = if (isNpaOts) false else form.ckccAadhaarAuthCompleted
-        val willingToRenew = if (isNpaOts) false else form.ckccWillingToRenew
-
         val schemes = if (isNpaOts) VisitFormData.NPA_OTS_SCHEMES else VisitFormData.OTS_SCHEMES
         val schemeDisplay = schemes.firstOrNull { it.first == scheme }?.second ?: scheme
 
         val responses = if (isNpaOts) VisitFormData.NPA_OTS_BORROWER_RESPONSES else VisitFormData.OTS_CUSTOMER_RESPONSES
         val responseDisplay = responses.firstOrNull { it.first == customerResponse }?.second ?: customerResponse
 
-        return """<table>
+        val sb = StringBuilder()
+        sb.append("""<table>
 <tr><th class="section-header" colspan="4">SECTION 4: KRM OTS DETAILS (IF APPLICABLE)</th></tr>
 <tr>
     <td class="label">OTS Eligibility</td><td>${yesNo(eligible)}</td>
@@ -353,20 +347,29 @@ th {
 </tr>
 <tr>
     <td class="label">Customer Response</td><td colspan="3">${esc(responseDisplay)}</td>
+</tr>""")
+
+        // KYC and renewal fields are only included for the regular OTS report type,
+        // because the NPA OTS form does not collect these separately.
+        if (!isNpaOts) {
+            sb.append("""
+<tr>
+    <td class="label">KYC Status</td><td>${if (form.ckccKycComplete) "Complete" else "Pending"}</td>
+    <td class="label">Aadhaar Seeded</td><td>${yesNo(form.ckccAadhaarSeeded)}</td>
 </tr>
 <tr>
-    <td class="label">KYC Status</td><td>${if (kycComplete) "Complete" else "Pending"}</td>
-    <td class="label">Aadhaar Seeded</td><td>${yesNo(aadhaarSeeded)}</td>
+    <td class="label">Mobile Linked</td><td>${yesNo(form.ckccMobileLinked)}</td>
+    <td class="label">Aadhaar Authentication</td><td>${if (form.ckccAadhaarAuthCompleted) "Completed" else "Pending"}</td>
 </tr>
 <tr>
-    <td class="label">Mobile Linked</td><td>${yesNo(mobileLinked)}</td>
-    <td class="label">Aadhaar Authentication</td><td>${if (aadhaarAuth) "Completed" else "Pending"}</td>
-</tr>
-<tr>
-    <td class="label">Renewal Consent</td><td colspan="3">Borrower Willing to Renew: ${yesNo(willingToRenew)}</td>
-</tr>
+    <td class="label">Renewal Consent</td><td colspan="3">Borrower Willing to Renew: ${yesNo(form.ckccWillingToRenew)}</td>
+</tr>""")
+        }
+
+        sb.append("""
 </table>
-"""
+""")
+        return sb.toString()
     }
 
     private fun section6PhysicalVerification(form: VisitFormData): String {
