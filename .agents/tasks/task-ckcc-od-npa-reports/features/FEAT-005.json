@@ -1,0 +1,34 @@
+{
+  "id": "FEAT-005",
+  "type": "feat",
+  "description": "Create ReportGenerator.kt utility that generates A4-formatted HTML matching the user's PDF document format for the KRM OTS / CKCC OD-2 Renewal / Recovery Verification Report. The HTML must render perfectly in a WebView and can be printed to PDF via Android's PrintManager. Follows the exact document structure provided by the user with all 12 sections. Replaces 'BC Agent' with 'BC Supervisor' and 'Employee ID' with 'BCBF Code' in the generated report.",
+  "status": "in_progress",
+  "steps": [
+    "1. Create android/app/src/main/java/com/lrms/recovery/report/ReportGenerator.kt in a new 'report' package.",
+    "2. The class takes a VisitFormData and supplementary data (borrower name, father/husband name, loan account number, mobile, aadhaar last 4, branch name, branch code, regional office, zone, cbc name, bc supervisor name, bc code, linked branch, district, mobile number, IIBF number, outstanding amount, overdue amount) and generates a complete HTML string.",
+    "3. HTML structure must match the exact PDF format: header with 'D2 RECOVERY SOLUTIONS & SERVICES', 'FIELD VISIT VERIFICATION REPORT', '(KRM OTS / CKCC OD-2 Renewal / Recovery Verification Report)', 'RBI Guidelines & Bank's Code of Conduct Compliant Format'.",
+    "4. Sections: (1) GENERAL INFORMATION with case type checkboxes shown as checked/unchecked, branch details, BC Supervisor Name, BCBF Code; (2) BORROWER INFORMATION; (3) LOAN ACCOUNT DETAILS with loan type checkboxes; (4) KRM OTS DETAILS (if applicable); (6) PHYSICAL VERIFICATION; (8) BC SUPERVISOR / DRA OBSERVATIONS; (9) RECOMMENDATION; (11) DECLARATION with full legal text; (12) CERTIFICATION with BC Supervisor and Supervisor Verification blocks (no Borrower Signature).",
+    "5. Style with CSS for A4 layout: @page { size: A4; margin: 15mm; }, body font-size 11px, table borders 1px solid #333, clean banking report style, proper cell padding, td vertical-align top.",
+    "6. All checkboxes rendered as Unicode ballot box characters. Checked items show filled box.",
+    "7. Currency values formatted with Indian grouping (using Formatters.money()).",
+    "8. The BC Supervisor name and BCBF Code must appear in the report header area.",
+    "9. Add unit test in android/app/src/test/java/com/lrms/recovery/report/ReportGeneratorTest.kt verifying that generated HTML contains key sections and proper field values, and does NOT contain 'BC Agent' or 'Employee ID' or 'Borrower Signature'."
+  ],
+  "acceptance_criteria": [
+    "ReportGenerator.kt generates complete HTML with all 12 sections",
+    "HTML uses A4 CSS styling suitable for WebView rendering and printing",
+    "Report shows 'BC Supervisor' instead of 'BC Agent' everywhere",
+    "Report shows 'BCBF Code' instead of 'Employee ID'",
+    "No 'Borrower Signature' section appears in the generated report",
+    "Supervisor name and BCBF Code appear in the report header",
+    "Unit test confirms HTML structure and naming conventions",
+    "./gradlew assembleDebug passes",
+    "./gradlew testDebugUnitTest passes"
+  ],
+  "verification": [
+    "cd /projects/bankmityra3/android && JAVA_HOME=/opt/toolchains/.local/share/mise/installs/java/17.0.2 ./gradlew --no-daemon testDebugUnitTest",
+    "cd /projects/bankmityra3/android && JAVA_HOME=/opt/toolchains/.local/share/mise/installs/java/17.0.2 ./gradlew --no-daemon assembleDebug"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
