@@ -16,14 +16,15 @@ class VisitFormDataTest {
 
     private fun validForm() = VisitFormData(
         loanAccountId = 42,
-        visitDate = "2026-07-30",
-        visitTime = "14:30",
-        customerMet = true,
+    ).apply {
+        visitDate = "2026-07-30"
+        visitTime = "14:30"
+        customerMet = true
         // Section 11. A form without it is deliberately invalid: the declaration is
         // printed in full on every copy, so submitting without ticking it would put
         // words in the agent's mouth.
-        declarationAccepted = true,
-    )
+        declarationAccepted = true
+    }
 
     // -----------------------------------------------------------------------
     // Validation
@@ -267,13 +268,13 @@ class VisitFormDataTest {
 
     @Test
     fun `hasUnsavedInput is false for an untouched form`() {
-        val untouched = VisitFormData(loanAccountId = 1, visitDate = "2026-07-30", visitTime = "10:00")
+        val untouched = VisitFormData(loanAccountId = 1).apply { visitDate = "2026-07-30"; visitTime = "10:00" }
         assertFalse(untouched.hasUnsavedInput())
     }
 
     @Test
     fun `hasUnsavedInput becomes true once anything is entered`() {
-        val base = VisitFormData(loanAccountId = 1, visitDate = "2026-07-30", visitTime = "10:00")
+        val base = VisitFormData(loanAccountId = 1).apply { visitDate = "2026-07-30"; visitTime = "10:00" }
 
         assertTrue(base.copy(customerMet = true).hasUnsavedInput())
         assertTrue(base.copy(remarks = "note").hasUnsavedInput())
@@ -302,30 +303,33 @@ class VisitFormDataTest {
 
     private fun otsForm(): VisitFormData = VisitFormData(
         loanAccountId = 7,
-        reportType = VisitFormData.REPORT_OTS,
-        visitDate = "2026-07-31",
-        visitTime = "10:30:00",
-        customerMet = true,
-        declarationAccepted = true,
-    )
+    ).apply {
+        reportType = VisitFormData.REPORT_OTS
+        visitDate = "2026-07-31"
+        visitTime = "10:30:00"
+        customerMet = true
+        declarationAccepted = true
+    }
 
     private fun ckccForm(): VisitFormData = VisitFormData(
         loanAccountId = 7,
-        reportType = VisitFormData.REPORT_CKCC,
-        visitDate = "2026-07-31",
-        visitTime = "10:30:00",
-        customerMet = true,
-        declarationAccepted = true,
-    )
+    ).apply {
+        reportType = VisitFormData.REPORT_CKCC
+        visitDate = "2026-07-31"
+        visitTime = "10:30:00"
+        customerMet = true
+        declarationAccepted = true
+    }
 
     @Test
     fun `a recovery report sends no settlement or renewal fields`() {
         val fields = VisitFormData(
             loanAccountId = 1,
-            visitDate = "2026-07-31",
-            visitTime = "09:00:00",
-            customerMet = true,
-        ).toFieldMap()
+        ).apply {
+            visitDate = "2026-07-31"
+            visitTime = "09:00:00"
+            customerMet = true
+        }.toFieldMap()
 
         assertEquals("recovery", fields["report_type"])
         // A stray section would make the server write an empty detail row that a
@@ -605,9 +609,9 @@ class VisitFormDataTest {
 
     @Test
     fun `the case type list is the printed form's, in its order`() {
-        assertEquals(7, VisitFormData.REPORT_TYPES.size)
+        assertEquals(8, VisitFormData.REPORT_TYPES.size)
         assertEquals(
-            listOf("ots", "ckcc_renewal", "ckcc_od", "recovery", "pre_npa", "post_npa", "other"),
+            listOf("ots", "ckcc_renewal", "ckcc_od", "ckcc_npa_ots", "recovery", "pre_npa", "post_npa", "other"),
             VisitFormData.REPORT_TYPES.map { it.first },
         )
     }
@@ -875,12 +879,13 @@ class VisitFormDataTest {
 
     private fun ckccOdForm(): VisitFormData = VisitFormData(
         loanAccountId = 7,
-        reportType = VisitFormData.REPORT_CKCC_OD,
-        visitDate = "2026-07-31",
-        visitTime = "10:30:00",
-        customerMet = true,
-        declarationAccepted = true,
-    )
+    ).apply {
+        reportType = VisitFormData.REPORT_CKCC_OD
+        visitDate = "2026-07-31"
+        visitTime = "10:30:00"
+        customerMet = true
+        declarationAccepted = true
+    }
 
     @Test
     fun `CKCC OD fields are serialized under ckcc_od_details prefix`() {
@@ -973,8 +978,154 @@ class VisitFormDataTest {
 
     @Test
     fun `CKCC OD observation counts as unsaved input`() {
-        val form = VisitFormData(loanAccountId = 1, visitDate = "2026-07-30", visitTime = "10:00")
+        val form = VisitFormData(loanAccountId = 1).apply { visitDate = "2026-07-30"; visitTime = "10:00" }
         assertFalse(form.hasUnsavedInput())
         assertTrue(form.copy(ckccOdObservation = "test").hasUnsavedInput())
+    }
+
+    // =======================================================================
+    // CKCC NPA KRM OTS Scheme Field Report
+    // =======================================================================
+
+    private fun npaOtsForm(): VisitFormData = VisitFormData(
+        loanAccountId = 7,
+    ).apply {
+        reportType = VisitFormData.REPORT_CKCC_NPA_OTS
+        visitDate = "2026-07-31"
+        visitTime = "10:30:00"
+        customerMet = true
+        declarationAccepted = true
+    }
+
+    @Test
+    fun `NPA OTS fields are serialized under npa_ots_details prefix`() {
+        val form = npaOtsForm().apply {
+            npaOtsCifNumber = "CIF999"
+            npaOtsSanctionDate = "2024-03-01"
+            npaOtsSanctionLimit = "5,00,000"
+            npaOtsDrawingPower = "4,50,000"
+            npaOtsOutstanding = "3,00,000"
+            npaOtsInterestOverdue = "25000"
+            npaOtsNpaDate = "2025-12-01"
+            npaOtsDaysPastDue = "180"
+            npaOtsAssetClassification = "npa"
+            npaOtsEligibleForOts = true
+            npaOtsScheme = "krm_ots"
+            npaOtsReliefPercent = "77.5"
+            npaOtsRlbAmount = "3,00,000"
+            npaOtsPayablePercent = "22.5"
+            npaOtsPayableAmount = "67500"
+            npaOtsTotalSettlement = "67500"
+            npaOtsDepositPercent = "10"
+            npaOtsRequiredDeposit = "6750"
+            npaOtsDepositReceived = true
+            npaOtsDepositAmount = "6750"
+            npaOtsDepositDate = "2026-07-30"
+            npaOtsDepositReference = "TXN/NPA/001"
+            npaOtsBalancePayable = "60750"
+            npaOtsFinalPaymentDate = "2026-09-30"
+            npaOtsApprovalStatus = "approved"
+            npaOtsValidityFrom = "2026-07-01"
+            npaOtsValidityTo = "2026-09-30"
+            npaOtsExpectedClosureDate = "2026-09-15"
+            npaOtsBorrowerResponse = "accepted"
+            npaOtsObservation = "Borrower cooperative"
+            npaOtsRecProposalRecommended = true
+            npaOtsStCustomerContacted = true
+            npaOtsStOtsAccepted = true
+        }
+        val fields = form.toFieldMap()
+
+        assertEquals("ckcc_npa_ots", fields["report_type"])
+        assertEquals("CIF999", fields["npa_ots_details[cif_number]"])
+        assertEquals("2024-03-01", fields["npa_ots_details[sanction_date]"])
+        assertEquals("500000.0", fields["npa_ots_details[sanction_limit]"])
+        assertEquals("450000.0", fields["npa_ots_details[drawing_power]"])
+        assertEquals("300000.0", fields["npa_ots_details[outstanding_amount]"])
+        assertEquals("25000.0", fields["npa_ots_details[interest_overdue]"])
+        assertEquals("2025-12-01", fields["npa_ots_details[npa_date]"])
+        assertEquals("180", fields["npa_ots_details[days_past_due]"])
+        assertEquals("npa", fields["npa_ots_details[asset_classification]"])
+        assertEquals("1", fields["npa_ots_details[eligible_for_ots]"])
+        assertEquals("krm_ots", fields["npa_ots_details[scheme]"])
+        assertEquals("77.5", fields["npa_ots_details[relief_percent]"])
+        assertEquals("300000.0", fields["npa_ots_details[rlb_amount]"])
+        assertEquals("22.5", fields["npa_ots_details[payable_percent]"])
+        assertEquals("67500.0", fields["npa_ots_details[payable_amount]"])
+        assertEquals("67500.0", fields["npa_ots_details[total_settlement]"])
+        assertEquals("10.0", fields["npa_ots_details[deposit_percent]"])
+        assertEquals("6750.0", fields["npa_ots_details[required_deposit]"])
+        assertEquals("1", fields["npa_ots_details[deposit_received]"])
+        assertEquals("6750.0", fields["npa_ots_details[deposit_amount]"])
+        assertEquals("2026-07-30", fields["npa_ots_details[deposit_date]"])
+        assertEquals("TXN/NPA/001", fields["npa_ots_details[deposit_reference]"])
+        assertEquals("60750.0", fields["npa_ots_details[balance_payable]"])
+        assertEquals("2026-09-30", fields["npa_ots_details[final_payment_date]"])
+        assertEquals("approved", fields["npa_ots_details[approval_status]"])
+        assertEquals("2026-07-01", fields["npa_ots_details[validity_from]"])
+        assertEquals("2026-09-30", fields["npa_ots_details[validity_to]"])
+        assertEquals("2026-09-15", fields["npa_ots_details[expected_closure_date]"])
+        assertEquals("accepted", fields["npa_ots_details[borrower_response]"])
+        assertEquals("Borrower cooperative", fields["npa_ots_details[observation]"])
+        assertEquals("1", fields["npa_ots_details[rec_proposal_recommended]"])
+        assertEquals("1", fields["npa_ots_details[st_customer_contacted]"])
+        assertEquals("1", fields["npa_ots_details[st_ots_accepted]"])
+
+        // Must not send other section details
+        assertTrue(fields.keys.none { it.startsWith("ots_details") })
+        assertTrue(fields.keys.none { it.startsWith("ckcc_details[") })
+        assertTrue(fields.keys.none { it.startsWith("ckcc_od_details") })
+    }
+
+    @Test
+    fun `NPA OTS deposit validation requires amount date and reference`() {
+        val errors = npaOtsForm().apply {
+            npaOtsDepositReceived = true
+        }.validate()
+
+        assertTrue(errors.containsKey("npa_ots_deposit_amount"))
+        assertTrue(errors.containsKey("npa_ots_deposit_date"))
+        assertTrue(errors.containsKey("npa_ots_deposit_reference"))
+    }
+
+    @Test
+    fun `NPA OTS percentage range validation`() {
+        val errors = npaOtsForm().apply {
+            npaOtsReliefPercent = "150"
+            npaOtsPayablePercent = "-5"
+        }.validate()
+        assertTrue(errors.containsKey("npa_ots_relief_percent"))
+        assertTrue(errors.containsKey("npa_ots_payable_percent"))
+    }
+
+    @Test
+    fun `NPA OTS validity window cannot end before it starts`() {
+        val errors = npaOtsForm().apply {
+            npaOtsValidityFrom = "2026-08-01"
+            npaOtsValidityTo = "2026-07-01"
+        }.validate()
+        assertTrue(errors.containsKey("npa_ots_validity_to"))
+    }
+
+    @Test
+    fun `NPA OTS scheme required when eligible`() {
+        val errors = npaOtsForm().apply {
+            npaOtsEligibleForOts = true
+        }.validate()
+        assertTrue(errors.containsKey("npa_ots_scheme"))
+    }
+
+    @Test
+    fun `a recovery report does not send npa_ots_details`() {
+        val fields = validForm().toFieldMap()
+        assertEquals("recovery", fields["report_type"])
+        assertTrue(fields.keys.none { it.startsWith("npa_ots_details") })
+    }
+
+    @Test
+    fun `NPA OTS observation counts as unsaved input`() {
+        val form = VisitFormData(loanAccountId = 1).apply { visitDate = "2026-07-30"; visitTime = "10:00" }
+        assertFalse(form.hasUnsavedInput())
+        assertTrue(form.copy(npaOtsObservation = "test").hasUnsavedInput())
     }
 }

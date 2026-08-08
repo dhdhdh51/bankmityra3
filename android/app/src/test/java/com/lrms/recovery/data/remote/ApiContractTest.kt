@@ -299,7 +299,7 @@ class ApiContractTest {
         // be silently dropped from the report.
         val types = payload.reportTypes.map { it.value }
         assertEquals(
-            listOf("ots", "ckcc_renewal", "ckcc_od", "recovery", "pre_npa", "post_npa", "other"),
+            listOf("ots", "ckcc_renewal", "ckcc_od", "ckcc_npa_ots", "recovery", "pre_npa", "post_npa", "other"),
             types,
         )
         assertTrue("each type needs a label", payload.reportTypes.all { it.label.isNotBlank() })

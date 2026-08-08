@@ -1,0 +1,25 @@
+{
+  "id": "FEAT-004",
+  "type": "fix",
+  "description": "Fix ClassFormatError by converting VisitFormData from 'data class' to a regular 'class'. The class now has 308 constructor parameters, exceeding the JVM 255-argument method signature limit. The data class copy/equals/hashCode/toString methods fail. Convert to regular class and add explicit equals/hashCode only if tests need them, otherwise just remove the 'data' keyword. Also update test file if needed.",
+  "status": "in_progress",
+  "steps": [
+    "1. In VisitFormData.kt, change 'data class VisitFormData(' to 'class VisitFormData(' - just removing the 'data' keyword is sufficient.",
+    "2. If any test or code uses .copy() on VisitFormData, replace with manual field assignment or remove (search for '.copy(' usage).",
+    "3. If any code relies on VisitFormData structural equality (== comparison), add a minimal equals/hashCode that checks clientUuid only, since that is the idempotency key.",
+    "4. Run tests: JAVA_HOME=/opt/toolchains/.local/share/mise/installs/java/17.0.2 ./gradlew --no-daemon testDebugUnitTest and fix any failures.",
+    "5. If ApiContractTest references REPORT_TYPES count/order with the new types, update its expectations to include the new entries."
+  ],
+  "acceptance_criteria": [
+    "VisitFormData is no longer a data class",
+    "All unit tests pass (no ClassFormatError)",
+    "./gradlew testDebugUnitTest passes with 0 failures",
+    "./gradlew assembleDebug passes"
+  ],
+  "verification": [
+    "cd /projects/bankmityra3/android && JAVA_HOME=/opt/toolchains/.local/share/mise/installs/java/17.0.2 ./gradlew --no-daemon testDebugUnitTest",
+    "cd /projects/bankmityra3/android && JAVA_HOME=/opt/toolchains/.local/share/mise/installs/java/17.0.2 ./gradlew --no-daemon assembleDebug"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

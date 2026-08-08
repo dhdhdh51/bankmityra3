@@ -317,6 +317,10 @@
                 "label": "CKCC OD Field Report"
             },
             {
+                "value": "ckcc_npa_ots",
+                "label": "CKCC NPA - KRM OTS Scheme"
+            },
+            {
                 "value": "recovery",
                 "label": "Recovery Follow-up"
             },

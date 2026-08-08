@@ -127,12 +127,13 @@ class VisitReportActivity : BaseActivity() {
 
         form = VisitFormData(
             loanAccountId = leadId,
-            visitDate = Formatters.todayIso(),
-            visitTime = Formatters.nowTimeIso(),
-            village = intent.getStringExtra(EXTRA_VILLAGE).orEmpty(),
-            appVersion = BuildConfig.VERSION_NAME,
-            deviceInfo = "${Build.MANUFACTURER} ${Build.MODEL} (Android ${Build.VERSION.RELEASE})",
-        )
+        ).apply {
+            visitDate = Formatters.todayIso()
+            visitTime = Formatters.nowTimeIso()
+            village = intent.getStringExtra(EXTRA_VILLAGE).orEmpty()
+            appVersion = BuildConfig.VERSION_NAME
+            deviceInfo = "${Build.MANUFACTURER} ${Build.MODEL} (Android ${Build.VERSION.RELEASE})"
+        }
 
         binding.toolbar.subtitle = intent.getStringExtra(EXTRA_CUSTOMER_NAME)
         leadLoanType = intent.getStringExtra(EXTRA_LOAN_TYPE).orEmpty()
@@ -154,6 +155,7 @@ class VisitReportActivity : BaseActivity() {
         setUpOts()
         setUpCkcc()
         setUpCkccOd()
+        setUpNpaOts()
 
         binding.buttonSubmit.setOnClickListener { submit() }
 
@@ -205,6 +207,8 @@ class VisitReportActivity : BaseActivity() {
             if (form.reportType == VisitFormData.REPORT_CKCC) View.VISIBLE else View.GONE
         binding.sectionCkccOd.root.visibility =
             if (form.reportType == VisitFormData.REPORT_CKCC_OD) View.VISIBLE else View.GONE
+        binding.sectionNpaOts.root.visibility =
+            if (form.reportType == VisitFormData.REPORT_CKCC_NPA_OTS) View.VISIBLE else View.GONE
     }
 
     // =======================================================================
@@ -516,6 +520,94 @@ class VisitReportActivity : BaseActivity() {
         c.checkCkccOdStPendingBranch.setOnCheckedChangeListener { _, v -> form.ckccOdStPendingAtBranch = v }
         c.checkCkccOdStFollowup.setOnCheckedChangeListener { _, v -> form.ckccOdStFollowupRequired = v }
         c.checkCkccOdStNpa.setOnCheckedChangeListener { _, v -> form.ckccOdStBecameNpa = v }
+    }
+
+    // =======================================================================
+    // CKCC NPA KRM OTS Scheme
+    // =======================================================================
+
+    private fun setUpNpaOts() {
+        val n = binding.sectionNpaOts
+
+        bindText(n.inputNpaOtsCif) { form.npaOtsCifNumber = it }
+        bindText(n.inputNpaOtsSanctionLimit) { form.npaOtsSanctionLimit = it }
+        bindText(n.inputNpaOtsDrawingPower) { form.npaOtsDrawingPower = it }
+        bindText(n.inputNpaOtsOutstanding) { form.npaOtsOutstanding = it }
+        bindText(n.inputNpaOtsInterestOverdue) { form.npaOtsInterestOverdue = it }
+        bindText(n.inputNpaOtsDaysPastDue) { form.npaOtsDaysPastDue = it }
+        bindText(n.inputNpaOtsReliefPercent) { form.npaOtsReliefPercent = it }
+        bindText(n.inputNpaOtsRlb) { form.npaOtsRlbAmount = it }
+        bindText(n.inputNpaOtsPayablePercent) { form.npaOtsPayablePercent = it }
+        bindText(n.inputNpaOtsPayableAmount) { form.npaOtsPayableAmount = it }
+        bindText(n.inputNpaOtsTotalSettlement) { form.npaOtsTotalSettlement = it }
+        bindText(n.inputNpaOtsDepositPercent) { form.npaOtsDepositPercent = it }
+        bindText(n.inputNpaOtsRequiredDeposit) { form.npaOtsRequiredDeposit = it }
+        bindText(n.inputNpaOtsDepositAmount) { form.npaOtsDepositAmount = it }
+        bindText(n.inputNpaOtsDepositReference) { form.npaOtsDepositReference = it }
+        bindText(n.inputNpaOtsBalancePayable) { form.npaOtsBalancePayable = it }
+        bindText(n.inputNpaOtsObservation) { form.npaOtsObservation = it }
+        bindText(n.inputNpaOtsRejectionReason) { form.npaOtsRejectionReason = it }
+        bindText(n.inputNpaOtsSchemeOther) { form.npaOtsSchemeOtherText = it }
+
+        bindDate(n.inputNpaOtsSanctionDate) { form.npaOtsSanctionDate = it }
+        bindDate(n.inputNpaOtsNpaDate) { form.npaOtsNpaDate = it }
+        bindDate(n.inputNpaOtsDepositDate) { form.npaOtsDepositDate = it }
+        bindDate(n.inputNpaOtsFinalPaymentDate) { form.npaOtsFinalPaymentDate = it }
+        bindDate(n.inputNpaOtsValidityFrom) { form.npaOtsValidityFrom = it }
+        bindDate(n.inputNpaOtsValidityTo) { form.npaOtsValidityTo = it }
+        bindDate(n.inputNpaOtsExpectedClosureDate) { form.npaOtsExpectedClosureDate = it }
+
+        n.inputNpaOtsAssetClassification.setSimpleItems(
+            VisitFormData.ASSET_CLASSIFICATIONS.map { it.second }.toTypedArray(),
+        )
+        n.inputNpaOtsAssetClassification.setOnItemClickListener { _, _, position, _ ->
+            form.npaOtsAssetClassification = VisitFormData.ASSET_CLASSIFICATIONS[position].first
+        }
+
+        n.inputNpaOtsScheme.setSimpleItems(
+            VisitFormData.NPA_OTS_SCHEMES.map { it.second }.toTypedArray(),
+        )
+        n.inputNpaOtsScheme.setOnItemClickListener { _, _, position, _ ->
+            form.npaOtsScheme = VisitFormData.NPA_OTS_SCHEMES[position].first
+            n.fieldNpaOtsSchemeOther.visibility =
+                if (form.npaOtsScheme == VisitFormData.OTS_SCHEME_OTHER) View.VISIBLE else View.GONE
+        }
+
+        n.inputNpaOtsApprovalStatus.setSimpleItems(
+            VisitFormData.OTS_APPROVAL_STATUSES.map { it.second }.toTypedArray(),
+        )
+        n.inputNpaOtsApprovalStatus.setOnItemClickListener { _, _, position, _ ->
+            form.npaOtsApprovalStatus = VisitFormData.OTS_APPROVAL_STATUSES[position].first
+        }
+
+        n.inputNpaOtsBorrowerResponse.setSimpleItems(
+            VisitFormData.NPA_OTS_BORROWER_RESPONSES.map { it.second }.toTypedArray(),
+        )
+        n.inputNpaOtsBorrowerResponse.setOnItemClickListener { _, _, position, _ ->
+            form.npaOtsBorrowerResponse = VisitFormData.NPA_OTS_BORROWER_RESPONSES[position].first
+            n.fieldNpaOtsRejectionReason.visibility =
+                if (form.npaOtsBorrowerResponse == "refused") View.VISIBLE else View.GONE
+        }
+
+        n.switchNpaOtsEligible.setOnCheckedChangeListener { _, v -> form.npaOtsEligibleForOts = v }
+
+        n.switchNpaOtsDepositReceived.setOnCheckedChangeListener { _, checked ->
+            form.npaOtsDepositReceived = checked
+            n.groupNpaOtsDeposit.visibility = if (checked) View.VISIBLE else View.GONE
+        }
+
+        n.checkNpaOtsRecProposal.setOnCheckedChangeListener { _, v -> form.npaOtsRecProposalRecommended = v }
+        n.checkNpaOtsRecFollowup.setOnCheckedChangeListener { _, v -> form.npaOtsRecFollowupRequired = v }
+        n.checkNpaOtsRecRefused.setOnCheckedChangeListener { _, v -> form.npaOtsRecCustomerRefused = v }
+        n.checkNpaOtsRecNotEligible.setOnCheckedChangeListener { _, v -> form.npaOtsRecNotEligible = v }
+
+        n.checkNpaOtsStContacted.setOnCheckedChangeListener { _, v -> form.npaOtsStCustomerContacted = v }
+        n.checkNpaOtsStVerified.setOnCheckedChangeListener { _, v -> form.npaOtsStCustomerVerified = v }
+        n.checkNpaOtsStAccepted.setOnCheckedChangeListener { _, v -> form.npaOtsStOtsAccepted = v }
+        n.checkNpaOtsStRejected.setOnCheckedChangeListener { _, v -> form.npaOtsStOtsRejected = v }
+        n.checkNpaOtsStDeposit.setOnCheckedChangeListener { _, v -> form.npaOtsStInitialDepositReceived = v }
+        n.checkNpaOtsStClosed.setOnCheckedChangeListener { _, v -> form.npaOtsStOtsClosed = v }
+        n.checkNpaOtsStFollowup.setOnCheckedChangeListener { _, v -> form.npaOtsStFollowupRequired = v }
     }
 
     // =======================================================================

@@ -14,64 +14,66 @@ import java.util.UUID
  * an idempotency key, so a retry after a dropped connection returns the original
  * report instead of filing a duplicate visit.
  */
-data class VisitFormData(
+class VisitFormData(
     val loanAccountId: Int,
+) {
+
 
     /**
      * Which of the three field reports this is. Chosen from a dropdown at the top
      * of the form; the extra sections appear only for the type selected, so a
      * plain recovery call is not buried under sixty settlement fields.
      */
-    var reportType: String = REPORT_RECOVERY,
+    var reportType: String = REPORT_RECOVERY
 
     /** Free text, and only meaningful when [reportType] is [REPORT_OTHER]. */
-    var reportTypeOtherText: String = "",
+    var reportTypeOtherText: String = ""
 
     // ---- General -----------------------------------------------------------
-    var visitDate: String = "",
-    var visitTime: String = "",
-    var village: String = "",
+    var visitDate: String = ""
+    var visitTime: String = ""
+    var village: String = ""
 
     // ---- 2. Borrower information -------------------------------------------
     // The identity fields the printed form asks for that the borrower record does not
     // already hold. All optional: an agent who cannot get a date of birth at the door
     // must still be able to file the visit that happened.
-    var gender: String = "",
-    var dateOfBirth: String = "",
-    var panNumber: String = "",
-    var addrVillage: String = "",
-    var gramPanchayat: String = "",
-    var tehsil: String = "",
-    var addrDistrict: String = "",
-    var state: String = "",
-    var pinCode: String = "",
+    var gender: String = ""
+    var dateOfBirth: String = ""
+    var panNumber: String = ""
+    var addrVillage: String = ""
+    var gramPanchayat: String = ""
+    var tehsil: String = ""
+    var addrDistrict: String = ""
+    var state: String = ""
+    var pinCode: String = ""
 
     // ---- 3. Loan account details -------------------------------------------
     // Pre-filled from the account where the bank's export supplied a figure, so the
     // agent confirms rather than copies a passbook by hand - and can correct what the
     // export got wrong.
-    var cifNumber: String = "",
-    var loanType: String = "",
-    var loanTypeOtherText: String = "",
-    var sanctionDate: String = "",
-    var sanctionLimit: String = "",
-    var drawingPower: String = "",
-    var interestOverdue: String = "",
-    var assetClassification: String = "",
+    var cifNumber: String = ""
+    var loanType: String = ""
+    var loanTypeOtherText: String = ""
+    var sanctionDate: String = ""
+    var sanctionLimit: String = ""
+    var drawingPower: String = ""
+    var interestOverdue: String = ""
+    var assetClassification: String = ""
 
     // ---- Customer contact --------------------------------------------------
-    var customerMet: Boolean = false,
-    var familyMemberMet: Boolean = false,
-    var houseLocked: Boolean = false,
-    var phoneContact: Boolean = false,
-    var phoneSwitchedOff: Boolean = false,
-    var familyMemberName: String = "",
-    var familyMemberRelationship: String = "",
+    var customerMet: Boolean = false
+    var familyMemberMet: Boolean = false
+    var houseLocked: Boolean = false
+    var phoneContact: Boolean = false
+    var phoneSwitchedOff: Boolean = false
+    var familyMemberName: String = ""
+    var familyMemberRelationship: String = ""
 
     // ---- Physical verification ---------------------------------------------
-    var borrowerAlive: Boolean = true,
-    var sameAddress: Boolean = true,
-    var shifted: Boolean = false,
+    var borrowerAlive: Boolean = true
+    var sameAddress: Boolean = true
+    var shifted: Boolean = false
 
     /**
      * Both blank until answered, and blank is sent as nothing at all.
@@ -80,42 +82,42 @@ data class VisitFormData(
      * form that recorded silence as a negative would accuse an agent of failing a check
      * nobody asked them for.
      */
-    var residenceVerified: String = "",
-    var neighbourVerification: String = "",
+    var residenceVerified: String = ""
+    var neighbourVerification: String = ""
 
-    var occupation: String = "",
-    var occupationOtherText: String = "",
+    var occupation: String = ""
+    var occupationOtherText: String = ""
 
     // ---- 7. Documents verified ---------------------------------------------
     // What the borrower physically produced. Asked on EVERY case type: this checklist
     // used to sit inside the renewal section, so a recovery visit had nowhere to record
     // that an Aadhaar card was shown at all.
-    var docAadhaar: Boolean = false,
-    var docPan: Boolean = false,
-    var docPassbook: Boolean = false,
-    var docLandRecord: Boolean = false,
-    var docKhatauni: Boolean = false,
-    var docElectricityBill: Boolean = false,
-    var docPhotograph: Boolean = false,
-    var docMobileVerified: Boolean = false,
-    var docRenewalForm: Boolean = false,
-    var docOtsConsentLetter: Boolean = false,
-    var docOthers: Boolean = false,
-    var docOtherText: String = "",
+    var docAadhaar: Boolean = false
+    var docPan: Boolean = false
+    var docPassbook: Boolean = false
+    var docLandRecord: Boolean = false
+    var docKhatauni: Boolean = false
+    var docElectricityBill: Boolean = false
+    var docPhotograph: Boolean = false
+    var docMobileVerified: Boolean = false
+    var docRenewalForm: Boolean = false
+    var docOtsConsentLetter: Boolean = false
+    var docOthers: Boolean = false
+    var docOtherText: String = ""
 
     // ---- 10. Evidence attached ---------------------------------------------
     // What the agent SAYS is attached, recorded separately from the files that actually
     // arrive. The gap between the two is the point.
-    var evBorrowerPhoto: Boolean = false,
-    var evHousePhoto: Boolean = false,
-    var evLandPhoto: Boolean = false,
-    var evAadhaarCopy: Boolean = false,
-    var evPassbookCopy: Boolean = false,
-    var evGpsLocation: Boolean = false,
-    var evRenewalForm: Boolean = false,
-    var evOtsConsent: Boolean = false,
-    var evOthers: Boolean = false,
-    var evOtherText: String = "",
+    var evBorrowerPhoto: Boolean = false
+    var evHousePhoto: Boolean = false
+    var evLandPhoto: Boolean = false
+    var evAadhaarCopy: Boolean = false
+    var evPassbookCopy: Boolean = false
+    var evGpsLocation: Boolean = false
+    var evRenewalForm: Boolean = false
+    var evOtsConsent: Boolean = false
+    var evOthers: Boolean = false
+    var evOtherText: String = ""
 
     // ---- 11. Declaration ---------------------------------------------------
     /**
@@ -125,35 +127,35 @@ data class VisitFormData(
      * printed in full on every copy of the report, and a printed certification nobody
      * agreed to is worth nothing.
      */
-    var declarationAccepted: Boolean = false,
+    var declarationAccepted: Boolean = false
 
     // ---- Recovery possibility ----------------------------------------------
-    var readyToPay: Boolean = false,
-    var notReady: Boolean = false,
-    var interestPayment: Boolean = false,
-    var ots: Boolean = false,
-    var promiseAmount: String = "",
-    var promiseDate: String = "",
+    var readyToPay: Boolean = false
+    var notReady: Boolean = false
+    var interestPayment: Boolean = false
+    var ots: Boolean = false
+    var promiseAmount: String = ""
+    var promiseDate: String = ""
 
     // ---- Non-payment reason ------------------------------------------------
-    var reasonFinancialProblem: Boolean = false,
-    var reasonCropLoss: Boolean = false,
-    var reasonAnimalLoss: Boolean = false,
-    var reasonIllness: Boolean = false,
-    var reasonUnemployment: Boolean = false,
-    var reasonDispute: Boolean = false,
-    var reasonOtherLoan: Boolean = false,
-    var reasonOthers: Boolean = false,
-    var reasonOtherText: String = "",
+    var reasonFinancialProblem: Boolean = false
+    var reasonCropLoss: Boolean = false
+    var reasonAnimalLoss: Boolean = false
+    var reasonIllness: Boolean = false
+    var reasonUnemployment: Boolean = false
+    var reasonDispute: Boolean = false
+    var reasonOtherLoan: Boolean = false
+    var reasonOthers: Boolean = false
+    var reasonOtherText: String = ""
 
     // ---- Agent recommendation ----------------------------------------------
-    var recRecoveryPossible: Boolean = false,
-    var recRegularFollowup: Boolean = false,
-    var recLegalAction: Boolean = false,
-    var recRc: Boolean = false,
-    var recOts: Boolean = false,
-    var recOthers: Boolean = false,
-    var recOtherText: String = "",
+    var recRecoveryPossible: Boolean = false
+    var recRegularFollowup: Boolean = false
+    var recLegalAction: Boolean = false
+    var recRc: Boolean = false
+    var recOts: Boolean = false
+    var recOthers: Boolean = false
+    var recOtherText: String = ""
 
     /**
      * Section 9's free-prose box.
@@ -161,15 +163,15 @@ data class VisitFormData(
      * Separate from [remarks], because the form asks two different questions: what was
      * seen, and what should be done about it. One field could not say which an answer was.
      */
-    var generalRecommendation: String = "",
+    var generalRecommendation: String = ""
 
     // ---- Remarks -----------------------------------------------------------
-    var remarks: String = "",
+    var remarks: String = ""
 
     // ---- Documents ---------------------------------------------------------
-    var customerPhoto: File? = null,
-    var housePhoto: File? = null,
-    var aadhaarPhoto: File? = null,
+    var customerPhoto: File? = null
+    var housePhoto: File? = null
+    var aadhaarPhoto: File? = null
     /**
      * The agent's own photograph, taken at the door.
      *
@@ -177,31 +179,31 @@ data class VisitFormData(
      * office and proves only that they have a face. This one carries the fix that says
      * where they were standing, which is what a disputed visit actually turns on.
      */
-    var agentPhoto: File? = null,
-    var otherDocuments: MutableList<File> = mutableListOf(),
+    var agentPhoto: File? = null
+    var otherDocuments: MutableList<File> = mutableListOf()
 
     // ---- KRM / OTS settlement (report_type = ots) ---------------------------
-    var otsEligible: Boolean = false,
-    var otsScheme: String = "",
-    var otsSchemeOtherText: String = "",
-    var otsReliefPercent: String = "",
-    var otsRlbAmount: String = "",
-    var otsPayablePercent: String = DEFAULT_PAYABLE_PERCENT,
-    var otsPayableAmount: String = "",
-    var otsTotalSettlement: String = "",
-    var otsDepositPercent: String = DEFAULT_DEPOSIT_PERCENT,
-    var otsRequiredDeposit: String = "",
-    var otsDepositReceived: Boolean = false,
-    var otsDepositAmount: String = "",
-    var otsDepositDate: String = "",
-    var otsDepositReference: String = "",
-    var otsBalancePayable: String = "",
-    var otsFinalPaymentDate: String = "",
-    var otsApprovalStatus: String = OTS_STATUS_PENDING,
-    var otsValidityFrom: String = "",
-    var otsValidityTo: String = "",
-    var otsExpectedClosureDate: String = "",
-    var otsBorrowerAccepted: Boolean = false,
+    var otsEligible: Boolean = false
+    var otsScheme: String = ""
+    var otsSchemeOtherText: String = ""
+    var otsReliefPercent: String = ""
+    var otsRlbAmount: String = ""
+    var otsPayablePercent: String = DEFAULT_PAYABLE_PERCENT
+    var otsPayableAmount: String = ""
+    var otsTotalSettlement: String = ""
+    var otsDepositPercent: String = DEFAULT_DEPOSIT_PERCENT
+    var otsRequiredDeposit: String = ""
+    var otsDepositReceived: Boolean = false
+    var otsDepositAmount: String = ""
+    var otsDepositDate: String = ""
+    var otsDepositReference: String = ""
+    var otsBalancePayable: String = ""
+    var otsFinalPaymentDate: String = ""
+    var otsApprovalStatus: String = OTS_STATUS_PENDING
+    var otsValidityFrom: String = ""
+    var otsValidityTo: String = ""
+    var otsExpectedClosureDate: String = ""
+    var otsBorrowerAccepted: Boolean = false
     /**
      * WHY the borrower answered as they did, which the boolean above cannot carry.
      *
@@ -209,109 +211,154 @@ data class VisitFormData(
      * lead to entirely different next actions - another visit, a different scheme, or a
      * closed file.
      */
-    var otsCustomerResponse: String = "",
-    var otsRejectionReason: String = "",
+    var otsCustomerResponse: String = ""
+    var otsRejectionReason: String = ""
     /** When they say they will deposit, as against [otsDepositDate], when they did. */
-    var otsExpectedDepositDate: String = "",
+    var otsExpectedDepositDate: String = ""
 
-    var otsRecProposalRecommended: Boolean = false,
-    var otsRecFollowupRequired: Boolean = false,
-    var otsRecCustomerRefused: Boolean = false,
-    var otsRecNotEligible: Boolean = false,
+    var otsRecProposalRecommended: Boolean = false
+    var otsRecFollowupRequired: Boolean = false
+    var otsRecCustomerRefused: Boolean = false
+    var otsRecNotEligible: Boolean = false
 
-    var otsStCustomerContacted: Boolean = false,
-    var otsStCustomerVerified: Boolean = false,
-    var otsStOtsAccepted: Boolean = false,
-    var otsStOtsRejected: Boolean = false,
-    var otsStInitialDepositReceived: Boolean = false,
-    var otsStOtsClosed: Boolean = false,
-    var otsStFollowupRequired: Boolean = false,
+    var otsStCustomerContacted: Boolean = false
+    var otsStCustomerVerified: Boolean = false
+    var otsStOtsAccepted: Boolean = false
+    var otsStOtsRejected: Boolean = false
+    var otsStInitialDepositReceived: Boolean = false
+    var otsStOtsClosed: Boolean = false
+    var otsStFollowupRequired: Boolean = false
 
     // ---- CKCC OD-2 renewal (report_type = ckcc_renewal) ---------------------
-    var ckccCifNumber: String = "",
-    var ckccSanctionDate: String = "",
-    var ckccSanctionLimit: String = "",
-    var ckccDrawingPower: String = "",
-    var ckccOutstanding: String = "",
-    var ckccInterestOverdue: String = "",
-    var ckccRenewalDueDate: String = "",
-    var ckccEligibleForRenewal: Boolean = false,
-    var ckccKycComplete: Boolean = false,
-    var ckccAadhaarSeeded: Boolean = false,
-    var ckccMobileLinked: Boolean = false,
-    var ckccAadhaarAuthCompleted: Boolean = false,
+    var ckccCifNumber: String = ""
+    var ckccSanctionDate: String = ""
+    var ckccSanctionLimit: String = ""
+    var ckccDrawingPower: String = ""
+    var ckccOutstanding: String = ""
+    var ckccInterestOverdue: String = ""
+    var ckccRenewalDueDate: String = ""
+    var ckccEligibleForRenewal: Boolean = false
+    var ckccKycComplete: Boolean = false
+    var ckccAadhaarSeeded: Boolean = false
+    var ckccMobileLinked: Boolean = false
+    var ckccAadhaarAuthCompleted: Boolean = false
     // The document checklist is NOT here any more - it is section 7 on the main form,
     // asked once for every case type. Two copies meant a renewal report answered the
     // same eleven boxes twice and could disagree with itself.
-    var ckccWillingToRenew: Boolean = false,
-    var ckccDocumentsHandedOver: Boolean = false,
-    var ckccRenewalFormSigned: Boolean = false,
-    var ckccEkycCompleted: Boolean = false,
-    var ckccBiometricsCompleted: Boolean = false,
-    var ckccObservation: String = "",
-    var ckccRecRenewImmediately: Boolean = false,
-    var ckccRecDocumentsSubmitted: Boolean = false,
+    var ckccWillingToRenew: Boolean = false
+    var ckccDocumentsHandedOver: Boolean = false
+    var ckccRenewalFormSigned: Boolean = false
+    var ckccEkycCompleted: Boolean = false
+    var ckccBiometricsCompleted: Boolean = false
+    var ckccObservation: String = ""
+    var ckccRecRenewImmediately: Boolean = false
+    var ckccRecDocumentsSubmitted: Boolean = false
     /** The other half of "documents complete": one missing paper is a branch task. */
-    var ckccRecPendingDocuments: Boolean = false,
-    var ckccRecFollowupRequired: Boolean = false,
-    var ckccRecNotInterested: Boolean = false,
-    var ckccRecBranchContactUrgent: Boolean = false,
-    var ckccRecOthers: Boolean = false,
-    var ckccRecOtherText: String = "",
-    var ckccStCustomerContacted: Boolean = false,
-    var ckccStCustomerVerified: Boolean = false,
-    var ckccStDocumentsCollected: Boolean = false,
-    var ckccStApplicationSubmitted: Boolean = false,
-    var ckccStCkccRenewed: Boolean = false,
-    var ckccStPendingAtBranch: Boolean = false,
-    var ckccStFollowupRequired: Boolean = false,
-    var ckccStBecameNpa: Boolean = false,
+    var ckccRecPendingDocuments: Boolean = false
+    var ckccRecFollowupRequired: Boolean = false
+    var ckccRecNotInterested: Boolean = false
+    var ckccRecBranchContactUrgent: Boolean = false
+    var ckccRecOthers: Boolean = false
+    var ckccRecOtherText: String = ""
+    var ckccStCustomerContacted: Boolean = false
+    var ckccStCustomerVerified: Boolean = false
+    var ckccStDocumentsCollected: Boolean = false
+    var ckccStApplicationSubmitted: Boolean = false
+    var ckccStCkccRenewed: Boolean = false
+    var ckccStPendingAtBranch: Boolean = false
+    var ckccStFollowupRequired: Boolean = false
+    var ckccStBecameNpa: Boolean = false
 
     // ---- CKCC OD field report (report_type = ckcc_od) -----------------------
-    var ckccOdCifNumber: String = "",
-    var ckccOdSanctionDate: String = "",
-    var ckccOdSanctionLimit: String = "",
-    var ckccOdDrawingPower: String = "",
-    var ckccOdOutstanding: String = "",
-    var ckccOdInterestOverdue: String = "",
-    var ckccOdOdLimit: String = "",
-    var ckccOdOdUtilization: String = "",
-    var ckccOdLastCreditDate: String = "",
-    var ckccOdEligibleForRenewal: Boolean = false,
-    var ckccOdKycComplete: Boolean = false,
-    var ckccOdAadhaarSeeded: Boolean = false,
-    var ckccOdMobileLinked: Boolean = false,
-    var ckccOdAadhaarAuth: Boolean = false,
-    var ckccOdWillingToRenew: Boolean = false,
-    var ckccOdDocumentsHandedOver: Boolean = false,
-    var ckccOdRenewalFormSigned: Boolean = false,
-    var ckccOdEkycCompleted: Boolean = false,
-    var ckccOdBiometricsCompleted: Boolean = false,
-    var ckccOdObservation: String = "",
-    var ckccOdRecRenewImmediately: Boolean = false,
-    var ckccOdRecDocumentsSubmitted: Boolean = false,
-    var ckccOdRecPendingDocuments: Boolean = false,
-    var ckccOdRecFollowupRequired: Boolean = false,
-    var ckccOdRecNotInterested: Boolean = false,
-    var ckccOdRecBranchContactUrgent: Boolean = false,
-    var ckccOdRecOthers: Boolean = false,
-    var ckccOdRecOtherText: String = "",
-    var ckccOdStCustomerContacted: Boolean = false,
-    var ckccOdStCustomerVerified: Boolean = false,
-    var ckccOdStDocumentsCollected: Boolean = false,
-    var ckccOdStApplicationSubmitted: Boolean = false,
-    var ckccOdStRenewed: Boolean = false,
-    var ckccOdStPendingAtBranch: Boolean = false,
-    var ckccOdStFollowupRequired: Boolean = false,
-    var ckccOdStBecameNpa: Boolean = false,
+    var ckccOdCifNumber: String = ""
+    var ckccOdSanctionDate: String = ""
+    var ckccOdSanctionLimit: String = ""
+    var ckccOdDrawingPower: String = ""
+    var ckccOdOutstanding: String = ""
+    var ckccOdInterestOverdue: String = ""
+    var ckccOdOdLimit: String = ""
+    var ckccOdOdUtilization: String = ""
+    var ckccOdLastCreditDate: String = ""
+    var ckccOdEligibleForRenewal: Boolean = false
+    var ckccOdKycComplete: Boolean = false
+    var ckccOdAadhaarSeeded: Boolean = false
+    var ckccOdMobileLinked: Boolean = false
+    var ckccOdAadhaarAuth: Boolean = false
+    var ckccOdWillingToRenew: Boolean = false
+    var ckccOdDocumentsHandedOver: Boolean = false
+    var ckccOdRenewalFormSigned: Boolean = false
+    var ckccOdEkycCompleted: Boolean = false
+    var ckccOdBiometricsCompleted: Boolean = false
+    var ckccOdObservation: String = ""
+    var ckccOdRecRenewImmediately: Boolean = false
+    var ckccOdRecDocumentsSubmitted: Boolean = false
+    var ckccOdRecPendingDocuments: Boolean = false
+    var ckccOdRecFollowupRequired: Boolean = false
+    var ckccOdRecNotInterested: Boolean = false
+    var ckccOdRecBranchContactUrgent: Boolean = false
+    var ckccOdRecOthers: Boolean = false
+    var ckccOdRecOtherText: String = ""
+    var ckccOdStCustomerContacted: Boolean = false
+    var ckccOdStCustomerVerified: Boolean = false
+    var ckccOdStDocumentsCollected: Boolean = false
+    var ckccOdStApplicationSubmitted: Boolean = false
+    var ckccOdStRenewed: Boolean = false
+    var ckccOdStPendingAtBranch: Boolean = false
+    var ckccOdStFollowupRequired: Boolean = false
+    var ckccOdStBecameNpa: Boolean = false
+
+    // ---- CKCC NPA KRM OTS scheme (report_type = ckcc_npa_ots) ---------------
+    var npaOtsCifNumber: String = ""
+    var npaOtsSanctionDate: String = ""
+    var npaOtsSanctionLimit: String = ""
+    var npaOtsDrawingPower: String = ""
+    var npaOtsOutstanding: String = ""
+    var npaOtsInterestOverdue: String = ""
+    var npaOtsNpaDate: String = ""
+    var npaOtsDaysPastDue: String = ""
+    var npaOtsAssetClassification: String = ""
+    var npaOtsEligibleForOts: Boolean = false
+    var npaOtsScheme: String = ""
+    var npaOtsSchemeOtherText: String = ""
+    var npaOtsReliefPercent: String = ""
+    var npaOtsRlbAmount: String = ""
+    var npaOtsPayablePercent: String = ""
+    var npaOtsPayableAmount: String = ""
+    var npaOtsTotalSettlement: String = ""
+    var npaOtsDepositPercent: String = ""
+    var npaOtsRequiredDeposit: String = ""
+    var npaOtsDepositReceived: Boolean = false
+    var npaOtsDepositAmount: String = ""
+    var npaOtsDepositDate: String = ""
+    var npaOtsDepositReference: String = ""
+    var npaOtsBalancePayable: String = ""
+    var npaOtsFinalPaymentDate: String = ""
+    var npaOtsApprovalStatus: String = ""
+    var npaOtsValidityFrom: String = ""
+    var npaOtsValidityTo: String = ""
+    var npaOtsExpectedClosureDate: String = ""
+    var npaOtsBorrowerResponse: String = ""
+    var npaOtsRejectionReason: String = ""
+    var npaOtsObservation: String = ""
+    var npaOtsRecProposalRecommended: Boolean = false
+    var npaOtsRecFollowupRequired: Boolean = false
+    var npaOtsRecCustomerRefused: Boolean = false
+    var npaOtsRecNotEligible: Boolean = false
+    var npaOtsStCustomerContacted: Boolean = false
+    var npaOtsStCustomerVerified: Boolean = false
+    var npaOtsStOtsAccepted: Boolean = false
+    var npaOtsStOtsRejected: Boolean = false
+    var npaOtsStInitialDepositReceived: Boolean = false
+    var npaOtsStOtsClosed: Boolean = false
+    var npaOtsStFollowupRequired: Boolean = false
 
     // ---- Declaration -------------------------------------------------------
-    var spCbcName: String = "",
+    var spCbcName: String = ""
 
     // ---- Extra evidence (CKCC) ---------------------------------------------
-    var landPhoto: File? = null,
-    var passbookPhoto: File? = null,
-    var renewalFormPhoto: File? = null,
+    var landPhoto: File? = null
+    var passbookPhoto: File? = null
+    var renewalFormPhoto: File? = null
 
     // ---- Where the report was filed ----------------------------------------
     /**
@@ -328,14 +375,14 @@ data class VisitFormData(
      * gallery-picked image has none, and inheriting the report's would assert that
      * an unknown photo was taken at the doorstep.
      */
-    var gpsLatitude: Double? = null,
-    var gpsLongitude: Double? = null,
-    var gpsAccuracyMetres: Int? = null,
-    var gpsCapturedAt: String = "",
-    var gpsSource: String = "unavailable",
+    var gpsLatitude: Double? = null
+    var gpsLongitude: Double? = null
+    var gpsAccuracyMetres: Int? = null
+    var gpsCapturedAt: String = ""
+    var gpsSource: String = "unavailable"
 
     /** Slot name (`customer`, `house`, `aadhaar`) to "lat,lng,accuracyOrBlank". */
-    var photoStamps: MutableMap<String, String> = mutableMapOf(),
+    var photoStamps: MutableMap<String, String> = mutableMapOf()
 
     /**
      * Slot name to "camera" or "gallery".
@@ -345,13 +392,298 @@ data class VisitFormData(
      * report distinguish a doorstep photograph from a gallery pick instead of
      * labelling every image "unknown".
      */
-    var photoSources: MutableMap<String, String> = mutableMapOf(),
+    var photoSources: MutableMap<String, String> = mutableMapOf()
 
     // ---- Meta --------------------------------------------------------------
-    val clientUuid: String = UUID.randomUUID().toString(),
-    var appVersion: String = "",
-    var deviceInfo: String = "",
-) {
+    val clientUuid: String = UUID.randomUUID().toString()
+    var appVersion: String = ""
+    var deviceInfo: String = ""
+
+
+    /**
+     * Creates a shallow copy of this instance with optional field overrides.
+     *
+     * This replaces the compiler-generated data-class copy(), which is not available
+     * because the constructor exceeds the JVM 255-parameter limit. Only the fields
+     * that tests or callers actually override are exposed as parameters here.
+     */
+    fun copy(
+        visitDate: String = this.visitDate,
+        visitTime: String = this.visitTime,
+        customerMet: Boolean = this.customerMet,
+        familyMemberMet: Boolean = this.familyMemberMet,
+        familyMemberName: String = this.familyMemberName,
+        houseLocked: Boolean = this.houseLocked,
+        phoneContact: Boolean = this.phoneContact,
+        phoneSwitchedOff: Boolean = this.phoneSwitchedOff,
+        promiseAmount: String = this.promiseAmount,
+        promiseDate: String = this.promiseDate,
+        village: String = this.village,
+        remarks: String = this.remarks,
+        occupation: String = this.occupation,
+        occupationOtherText: String = this.occupationOtherText,
+        reasonOthers: Boolean = this.reasonOthers,
+        reasonOtherText: String = this.reasonOtherText,
+        reasonCropLoss: Boolean = this.reasonCropLoss,
+        recOthers: Boolean = this.recOthers,
+        recOtherText: String = this.recOtherText,
+        reportType: String = this.reportType,
+        ckccOdObservation: String = this.ckccOdObservation,
+        npaOtsObservation: String = this.npaOtsObservation,
+    ): VisitFormData {
+        val clone = VisitFormData(loanAccountId = this.loanAccountId)
+        // Copy every mutable field from this instance
+        clone.reportType = reportType
+        clone.reportTypeOtherText = this.reportTypeOtherText
+        clone.visitDate = visitDate
+        clone.visitTime = visitTime
+        clone.village = village
+        clone.gender = this.gender
+        clone.dateOfBirth = this.dateOfBirth
+        clone.panNumber = this.panNumber
+        clone.addrVillage = this.addrVillage
+        clone.gramPanchayat = this.gramPanchayat
+        clone.tehsil = this.tehsil
+        clone.addrDistrict = this.addrDistrict
+        clone.state = this.state
+        clone.pinCode = this.pinCode
+        clone.cifNumber = this.cifNumber
+        clone.loanType = this.loanType
+        clone.loanTypeOtherText = this.loanTypeOtherText
+        clone.sanctionDate = this.sanctionDate
+        clone.sanctionLimit = this.sanctionLimit
+        clone.drawingPower = this.drawingPower
+        clone.interestOverdue = this.interestOverdue
+        clone.assetClassification = this.assetClassification
+        clone.customerMet = customerMet
+        clone.familyMemberMet = familyMemberMet
+        clone.houseLocked = houseLocked
+        clone.phoneContact = phoneContact
+        clone.phoneSwitchedOff = phoneSwitchedOff
+        clone.familyMemberName = familyMemberName
+        clone.familyMemberRelationship = this.familyMemberRelationship
+        clone.borrowerAlive = this.borrowerAlive
+        clone.sameAddress = this.sameAddress
+        clone.shifted = this.shifted
+        clone.residenceVerified = this.residenceVerified
+        clone.neighbourVerification = this.neighbourVerification
+        clone.occupation = occupation
+        clone.occupationOtherText = occupationOtherText
+        clone.docAadhaar = this.docAadhaar
+        clone.docPan = this.docPan
+        clone.docPassbook = this.docPassbook
+        clone.docLandRecord = this.docLandRecord
+        clone.docKhatauni = this.docKhatauni
+        clone.docElectricityBill = this.docElectricityBill
+        clone.docPhotograph = this.docPhotograph
+        clone.docMobileVerified = this.docMobileVerified
+        clone.docRenewalForm = this.docRenewalForm
+        clone.docOtsConsentLetter = this.docOtsConsentLetter
+        clone.docOthers = this.docOthers
+        clone.docOtherText = this.docOtherText
+        clone.evBorrowerPhoto = this.evBorrowerPhoto
+        clone.evHousePhoto = this.evHousePhoto
+        clone.evLandPhoto = this.evLandPhoto
+        clone.evAadhaarCopy = this.evAadhaarCopy
+        clone.evPassbookCopy = this.evPassbookCopy
+        clone.evGpsLocation = this.evGpsLocation
+        clone.evRenewalForm = this.evRenewalForm
+        clone.evOtsConsent = this.evOtsConsent
+        clone.evOthers = this.evOthers
+        clone.evOtherText = this.evOtherText
+        clone.declarationAccepted = this.declarationAccepted
+        clone.readyToPay = this.readyToPay
+        clone.notReady = this.notReady
+        clone.interestPayment = this.interestPayment
+        clone.ots = this.ots
+        clone.promiseAmount = promiseAmount
+        clone.promiseDate = promiseDate
+        clone.reasonFinancialProblem = this.reasonFinancialProblem
+        clone.reasonCropLoss = reasonCropLoss
+        clone.reasonAnimalLoss = this.reasonAnimalLoss
+        clone.reasonIllness = this.reasonIllness
+        clone.reasonUnemployment = this.reasonUnemployment
+        clone.reasonDispute = this.reasonDispute
+        clone.reasonOtherLoan = this.reasonOtherLoan
+        clone.reasonOthers = reasonOthers
+        clone.reasonOtherText = reasonOtherText
+        clone.recRecoveryPossible = this.recRecoveryPossible
+        clone.recRegularFollowup = this.recRegularFollowup
+        clone.recLegalAction = this.recLegalAction
+        clone.recRc = this.recRc
+        clone.recOts = this.recOts
+        clone.recOthers = recOthers
+        clone.recOtherText = recOtherText
+        clone.generalRecommendation = this.generalRecommendation
+        clone.remarks = remarks
+        clone.customerPhoto = this.customerPhoto
+        clone.housePhoto = this.housePhoto
+        clone.aadhaarPhoto = this.aadhaarPhoto
+        clone.agentPhoto = this.agentPhoto
+        clone.otherDocuments = this.otherDocuments.toMutableList()
+        clone.otsEligible = this.otsEligible
+        clone.otsScheme = this.otsScheme
+        clone.otsSchemeOtherText = this.otsSchemeOtherText
+        clone.otsReliefPercent = this.otsReliefPercent
+        clone.otsRlbAmount = this.otsRlbAmount
+        clone.otsPayablePercent = this.otsPayablePercent
+        clone.otsPayableAmount = this.otsPayableAmount
+        clone.otsTotalSettlement = this.otsTotalSettlement
+        clone.otsDepositPercent = this.otsDepositPercent
+        clone.otsRequiredDeposit = this.otsRequiredDeposit
+        clone.otsDepositReceived = this.otsDepositReceived
+        clone.otsDepositAmount = this.otsDepositAmount
+        clone.otsDepositDate = this.otsDepositDate
+        clone.otsDepositReference = this.otsDepositReference
+        clone.otsBalancePayable = this.otsBalancePayable
+        clone.otsFinalPaymentDate = this.otsFinalPaymentDate
+        clone.otsApprovalStatus = this.otsApprovalStatus
+        clone.otsValidityFrom = this.otsValidityFrom
+        clone.otsValidityTo = this.otsValidityTo
+        clone.otsExpectedClosureDate = this.otsExpectedClosureDate
+        clone.otsBorrowerAccepted = this.otsBorrowerAccepted
+        clone.otsCustomerResponse = this.otsCustomerResponse
+        clone.otsRejectionReason = this.otsRejectionReason
+        clone.otsExpectedDepositDate = this.otsExpectedDepositDate
+        clone.otsRecProposalRecommended = this.otsRecProposalRecommended
+        clone.otsRecFollowupRequired = this.otsRecFollowupRequired
+        clone.otsRecCustomerRefused = this.otsRecCustomerRefused
+        clone.otsRecNotEligible = this.otsRecNotEligible
+        clone.otsStCustomerContacted = this.otsStCustomerContacted
+        clone.otsStCustomerVerified = this.otsStCustomerVerified
+        clone.otsStOtsAccepted = this.otsStOtsAccepted
+        clone.otsStOtsRejected = this.otsStOtsRejected
+        clone.otsStInitialDepositReceived = this.otsStInitialDepositReceived
+        clone.otsStOtsClosed = this.otsStOtsClosed
+        clone.otsStFollowupRequired = this.otsStFollowupRequired
+        clone.ckccCifNumber = this.ckccCifNumber
+        clone.ckccSanctionDate = this.ckccSanctionDate
+        clone.ckccSanctionLimit = this.ckccSanctionLimit
+        clone.ckccDrawingPower = this.ckccDrawingPower
+        clone.ckccOutstanding = this.ckccOutstanding
+        clone.ckccInterestOverdue = this.ckccInterestOverdue
+        clone.ckccRenewalDueDate = this.ckccRenewalDueDate
+        clone.ckccEligibleForRenewal = this.ckccEligibleForRenewal
+        clone.ckccKycComplete = this.ckccKycComplete
+        clone.ckccAadhaarSeeded = this.ckccAadhaarSeeded
+        clone.ckccMobileLinked = this.ckccMobileLinked
+        clone.ckccAadhaarAuthCompleted = this.ckccAadhaarAuthCompleted
+        clone.ckccWillingToRenew = this.ckccWillingToRenew
+        clone.ckccDocumentsHandedOver = this.ckccDocumentsHandedOver
+        clone.ckccRenewalFormSigned = this.ckccRenewalFormSigned
+        clone.ckccEkycCompleted = this.ckccEkycCompleted
+        clone.ckccBiometricsCompleted = this.ckccBiometricsCompleted
+        clone.ckccObservation = this.ckccObservation
+        clone.ckccRecRenewImmediately = this.ckccRecRenewImmediately
+        clone.ckccRecDocumentsSubmitted = this.ckccRecDocumentsSubmitted
+        clone.ckccRecPendingDocuments = this.ckccRecPendingDocuments
+        clone.ckccRecFollowupRequired = this.ckccRecFollowupRequired
+        clone.ckccRecNotInterested = this.ckccRecNotInterested
+        clone.ckccRecBranchContactUrgent = this.ckccRecBranchContactUrgent
+        clone.ckccRecOthers = this.ckccRecOthers
+        clone.ckccRecOtherText = this.ckccRecOtherText
+        clone.ckccStCustomerContacted = this.ckccStCustomerContacted
+        clone.ckccStCustomerVerified = this.ckccStCustomerVerified
+        clone.ckccStDocumentsCollected = this.ckccStDocumentsCollected
+        clone.ckccStApplicationSubmitted = this.ckccStApplicationSubmitted
+        clone.ckccStCkccRenewed = this.ckccStCkccRenewed
+        clone.ckccStPendingAtBranch = this.ckccStPendingAtBranch
+        clone.ckccStFollowupRequired = this.ckccStFollowupRequired
+        clone.ckccStBecameNpa = this.ckccStBecameNpa
+        clone.ckccOdCifNumber = this.ckccOdCifNumber
+        clone.ckccOdSanctionDate = this.ckccOdSanctionDate
+        clone.ckccOdSanctionLimit = this.ckccOdSanctionLimit
+        clone.ckccOdDrawingPower = this.ckccOdDrawingPower
+        clone.ckccOdOutstanding = this.ckccOdOutstanding
+        clone.ckccOdInterestOverdue = this.ckccOdInterestOverdue
+        clone.ckccOdOdLimit = this.ckccOdOdLimit
+        clone.ckccOdOdUtilization = this.ckccOdOdUtilization
+        clone.ckccOdLastCreditDate = this.ckccOdLastCreditDate
+        clone.ckccOdEligibleForRenewal = this.ckccOdEligibleForRenewal
+        clone.ckccOdKycComplete = this.ckccOdKycComplete
+        clone.ckccOdAadhaarSeeded = this.ckccOdAadhaarSeeded
+        clone.ckccOdMobileLinked = this.ckccOdMobileLinked
+        clone.ckccOdAadhaarAuth = this.ckccOdAadhaarAuth
+        clone.ckccOdWillingToRenew = this.ckccOdWillingToRenew
+        clone.ckccOdDocumentsHandedOver = this.ckccOdDocumentsHandedOver
+        clone.ckccOdRenewalFormSigned = this.ckccOdRenewalFormSigned
+        clone.ckccOdEkycCompleted = this.ckccOdEkycCompleted
+        clone.ckccOdBiometricsCompleted = this.ckccOdBiometricsCompleted
+        clone.ckccOdObservation = ckccOdObservation
+        clone.ckccOdRecRenewImmediately = this.ckccOdRecRenewImmediately
+        clone.ckccOdRecDocumentsSubmitted = this.ckccOdRecDocumentsSubmitted
+        clone.ckccOdRecPendingDocuments = this.ckccOdRecPendingDocuments
+        clone.ckccOdRecFollowupRequired = this.ckccOdRecFollowupRequired
+        clone.ckccOdRecNotInterested = this.ckccOdRecNotInterested
+        clone.ckccOdRecBranchContactUrgent = this.ckccOdRecBranchContactUrgent
+        clone.ckccOdRecOthers = this.ckccOdRecOthers
+        clone.ckccOdRecOtherText = this.ckccOdRecOtherText
+        clone.ckccOdStCustomerContacted = this.ckccOdStCustomerContacted
+        clone.ckccOdStCustomerVerified = this.ckccOdStCustomerVerified
+        clone.ckccOdStDocumentsCollected = this.ckccOdStDocumentsCollected
+        clone.ckccOdStApplicationSubmitted = this.ckccOdStApplicationSubmitted
+        clone.ckccOdStRenewed = this.ckccOdStRenewed
+        clone.ckccOdStPendingAtBranch = this.ckccOdStPendingAtBranch
+        clone.ckccOdStFollowupRequired = this.ckccOdStFollowupRequired
+        clone.ckccOdStBecameNpa = this.ckccOdStBecameNpa
+        clone.npaOtsCifNumber = this.npaOtsCifNumber
+        clone.npaOtsSanctionDate = this.npaOtsSanctionDate
+        clone.npaOtsSanctionLimit = this.npaOtsSanctionLimit
+        clone.npaOtsDrawingPower = this.npaOtsDrawingPower
+        clone.npaOtsOutstanding = this.npaOtsOutstanding
+        clone.npaOtsInterestOverdue = this.npaOtsInterestOverdue
+        clone.npaOtsNpaDate = this.npaOtsNpaDate
+        clone.npaOtsDaysPastDue = this.npaOtsDaysPastDue
+        clone.npaOtsAssetClassification = this.npaOtsAssetClassification
+        clone.npaOtsEligibleForOts = this.npaOtsEligibleForOts
+        clone.npaOtsScheme = this.npaOtsScheme
+        clone.npaOtsSchemeOtherText = this.npaOtsSchemeOtherText
+        clone.npaOtsReliefPercent = this.npaOtsReliefPercent
+        clone.npaOtsRlbAmount = this.npaOtsRlbAmount
+        clone.npaOtsPayablePercent = this.npaOtsPayablePercent
+        clone.npaOtsPayableAmount = this.npaOtsPayableAmount
+        clone.npaOtsTotalSettlement = this.npaOtsTotalSettlement
+        clone.npaOtsDepositPercent = this.npaOtsDepositPercent
+        clone.npaOtsRequiredDeposit = this.npaOtsRequiredDeposit
+        clone.npaOtsDepositReceived = this.npaOtsDepositReceived
+        clone.npaOtsDepositAmount = this.npaOtsDepositAmount
+        clone.npaOtsDepositDate = this.npaOtsDepositDate
+        clone.npaOtsDepositReference = this.npaOtsDepositReference
+        clone.npaOtsBalancePayable = this.npaOtsBalancePayable
+        clone.npaOtsFinalPaymentDate = this.npaOtsFinalPaymentDate
+        clone.npaOtsApprovalStatus = this.npaOtsApprovalStatus
+        clone.npaOtsValidityFrom = this.npaOtsValidityFrom
+        clone.npaOtsValidityTo = this.npaOtsValidityTo
+        clone.npaOtsExpectedClosureDate = this.npaOtsExpectedClosureDate
+        clone.npaOtsBorrowerResponse = this.npaOtsBorrowerResponse
+        clone.npaOtsRejectionReason = this.npaOtsRejectionReason
+        clone.npaOtsObservation = npaOtsObservation
+        clone.npaOtsRecProposalRecommended = this.npaOtsRecProposalRecommended
+        clone.npaOtsRecFollowupRequired = this.npaOtsRecFollowupRequired
+        clone.npaOtsRecCustomerRefused = this.npaOtsRecCustomerRefused
+        clone.npaOtsRecNotEligible = this.npaOtsRecNotEligible
+        clone.npaOtsStCustomerContacted = this.npaOtsStCustomerContacted
+        clone.npaOtsStCustomerVerified = this.npaOtsStCustomerVerified
+        clone.npaOtsStOtsAccepted = this.npaOtsStOtsAccepted
+        clone.npaOtsStOtsRejected = this.npaOtsStOtsRejected
+        clone.npaOtsStInitialDepositReceived = this.npaOtsStInitialDepositReceived
+        clone.npaOtsStOtsClosed = this.npaOtsStOtsClosed
+        clone.npaOtsStFollowupRequired = this.npaOtsStFollowupRequired
+        clone.spCbcName = this.spCbcName
+        clone.landPhoto = this.landPhoto
+        clone.passbookPhoto = this.passbookPhoto
+        clone.renewalFormPhoto = this.renewalFormPhoto
+        clone.gpsLatitude = this.gpsLatitude
+        clone.gpsLongitude = this.gpsLongitude
+        clone.gpsAccuracyMetres = this.gpsAccuracyMetres
+        clone.gpsCapturedAt = this.gpsCapturedAt
+        clone.gpsSource = this.gpsSource
+        clone.photoStamps = this.photoStamps.toMutableMap()
+        clone.photoSources = this.photoSources.toMutableMap()
+        clone.appVersion = this.appVersion
+        clone.deviceInfo = this.deviceInfo
+        return clone
+    }
 
     /**
      * Validates the report before submission.
@@ -449,6 +781,7 @@ data class VisitFormData(
         errors += validateOts()
         errors += validateCkcc()
         errors += validateCkccOd()
+        errors += validateCkccNpaOts()
 
         return errors
     }
@@ -569,6 +902,64 @@ data class VisitFormData(
             if (raw.isNotBlank() && number(raw) == null) {
                 errors[key] = "Enter a valid amount"
             }
+        }
+
+        return errors
+    }
+
+    private fun validateCkccNpaOts(): Map<String, String> {
+        if (reportType != REPORT_CKCC_NPA_OTS) return emptyMap()
+        val errors = mutableMapOf<String, String>()
+
+        if (npaOtsEligibleForOts && npaOtsScheme.isBlank()) {
+            errors["npa_ots_scheme"] = "Select the applicable scheme"
+        }
+        if (npaOtsScheme == OTS_SCHEME_OTHER && npaOtsSchemeOtherText.isBlank()) {
+            errors["npa_ots_scheme_other_text"] = "Name the scheme"
+        }
+        for ((key, raw) in listOf(
+            "npa_ots_relief_percent" to npaOtsReliefPercent,
+            "npa_ots_payable_percent" to npaOtsPayablePercent,
+            "npa_ots_deposit_percent" to npaOtsDepositPercent,
+        )) {
+            val value = number(raw) ?: continue
+            if (value < 0.0 || value > 100.0) {
+                errors[key] = "Enter a percentage between 0 and 100"
+            }
+        }
+        for ((key, raw) in listOf(
+            "npa_ots_sanction_limit" to npaOtsSanctionLimit,
+            "npa_ots_drawing_power" to npaOtsDrawingPower,
+            "npa_ots_outstanding" to npaOtsOutstanding,
+            "npa_ots_interest_overdue" to npaOtsInterestOverdue,
+            "npa_ots_rlb_amount" to npaOtsRlbAmount,
+            "npa_ots_payable_amount" to npaOtsPayableAmount,
+            "npa_ots_total_settlement" to npaOtsTotalSettlement,
+            "npa_ots_deposit_amount" to npaOtsDepositAmount,
+            "npa_ots_required_deposit" to npaOtsRequiredDeposit,
+            "npa_ots_balance_payable" to npaOtsBalancePayable,
+        )) {
+            if (raw.isNotBlank() && number(raw) == null) {
+                errors[key] = "Enter a valid amount"
+            }
+        }
+
+        if (npaOtsDepositReceived) {
+            if (number(npaOtsDepositAmount).let { it == null || it <= 0.0 }) {
+                errors["npa_ots_deposit_amount"] = "Enter the amount the borrower deposited"
+            }
+            if (npaOtsDepositDate.isBlank()) {
+                errors["npa_ots_deposit_date"] = "Enter the deposit date"
+            }
+            if (npaOtsDepositReference.isBlank()) {
+                errors["npa_ots_deposit_reference"] = "Enter the bank receipt or transaction number"
+            }
+        }
+
+        if (npaOtsValidityFrom.isNotBlank() && npaOtsValidityTo.isNotBlank() &&
+            npaOtsValidityTo < npaOtsValidityFrom
+        ) {
+            errors["npa_ots_validity_to"] = "The validity end cannot be before the start"
         }
 
         return errors
@@ -908,6 +1299,55 @@ data class VisitFormData(
             fields["ckcc_od_details[st_became_npa]"] = bool(ckccOdStBecameNpa)
         }
 
+        if (reportType == REPORT_CKCC_NPA_OTS) {
+            putIfNotBlank(fields, "npa_ots_details[cif_number]", npaOtsCifNumber)
+            putIfNotBlank(fields, "npa_ots_details[sanction_date]", npaOtsSanctionDate)
+            putAmount(fields, "npa_ots_details[sanction_limit]", npaOtsSanctionLimit)
+            putAmount(fields, "npa_ots_details[drawing_power]", npaOtsDrawingPower)
+            putAmount(fields, "npa_ots_details[outstanding_amount]", npaOtsOutstanding)
+            putAmount(fields, "npa_ots_details[interest_overdue]", npaOtsInterestOverdue)
+            putIfNotBlank(fields, "npa_ots_details[npa_date]", npaOtsNpaDate)
+            putIfNotBlank(fields, "npa_ots_details[days_past_due]", npaOtsDaysPastDue)
+            putIfNotBlank(fields, "npa_ots_details[asset_classification]", npaOtsAssetClassification)
+
+            fields["npa_ots_details[eligible_for_ots]"] = bool(npaOtsEligibleForOts)
+            putIfNotBlank(fields, "npa_ots_details[scheme]", npaOtsScheme)
+            putIfNotBlank(fields, "npa_ots_details[scheme_other_text]", npaOtsSchemeOtherText)
+            putAmount(fields, "npa_ots_details[relief_percent]", npaOtsReliefPercent)
+            putAmount(fields, "npa_ots_details[rlb_amount]", npaOtsRlbAmount)
+            putAmount(fields, "npa_ots_details[payable_percent]", npaOtsPayablePercent)
+            putAmount(fields, "npa_ots_details[payable_amount]", npaOtsPayableAmount)
+            putAmount(fields, "npa_ots_details[total_settlement]", npaOtsTotalSettlement)
+            putAmount(fields, "npa_ots_details[deposit_percent]", npaOtsDepositPercent)
+            putAmount(fields, "npa_ots_details[required_deposit]", npaOtsRequiredDeposit)
+            fields["npa_ots_details[deposit_received]"] = bool(npaOtsDepositReceived)
+            putAmount(fields, "npa_ots_details[deposit_amount]", npaOtsDepositAmount)
+            putIfNotBlank(fields, "npa_ots_details[deposit_date]", npaOtsDepositDate)
+            putIfNotBlank(fields, "npa_ots_details[deposit_reference]", npaOtsDepositReference)
+            putAmount(fields, "npa_ots_details[balance_payable]", npaOtsBalancePayable)
+            putIfNotBlank(fields, "npa_ots_details[final_payment_date]", npaOtsFinalPaymentDate)
+            putIfNotBlank(fields, "npa_ots_details[approval_status]", npaOtsApprovalStatus)
+            putIfNotBlank(fields, "npa_ots_details[validity_from]", npaOtsValidityFrom)
+            putIfNotBlank(fields, "npa_ots_details[validity_to]", npaOtsValidityTo)
+            putIfNotBlank(fields, "npa_ots_details[expected_closure_date]", npaOtsExpectedClosureDate)
+            putIfNotBlank(fields, "npa_ots_details[borrower_response]", npaOtsBorrowerResponse)
+            putIfNotBlank(fields, "npa_ots_details[rejection_reason]", npaOtsRejectionReason)
+            putIfNotBlank(fields, "npa_ots_details[observation]", npaOtsObservation)
+
+            fields["npa_ots_details[rec_proposal_recommended]"] = bool(npaOtsRecProposalRecommended)
+            fields["npa_ots_details[rec_followup_required]"] = bool(npaOtsRecFollowupRequired)
+            fields["npa_ots_details[rec_customer_refused]"] = bool(npaOtsRecCustomerRefused)
+            fields["npa_ots_details[rec_not_eligible]"] = bool(npaOtsRecNotEligible)
+
+            fields["npa_ots_details[st_customer_contacted]"] = bool(npaOtsStCustomerContacted)
+            fields["npa_ots_details[st_customer_verified]"] = bool(npaOtsStCustomerVerified)
+            fields["npa_ots_details[st_ots_accepted]"] = bool(npaOtsStOtsAccepted)
+            fields["npa_ots_details[st_ots_rejected]"] = bool(npaOtsStOtsRejected)
+            fields["npa_ots_details[st_initial_deposit_received]"] = bool(npaOtsStInitialDepositReceived)
+            fields["npa_ots_details[st_ots_closed]"] = bool(npaOtsStOtsClosed)
+            fields["npa_ots_details[st_followup_required]"] = bool(npaOtsStFollowupRequired)
+        }
+
         putIfNotBlank(fields, "remarks", remarks)
         putIfNotBlank(fields, "app_version", appVersion)
         putIfNotBlank(fields, "device_info", deviceInfo)
@@ -1006,6 +1446,8 @@ data class VisitFormData(
             ckccRenewalDueDate.isNotBlank() || ckccObservation.isNotBlank() ||
             ckccOdObservation.isNotBlank() || ckccOdOdLimit.isNotBlank() ||
             ckccOdSanctionLimit.isNotBlank() ||
+            npaOtsObservation.isNotBlank() || npaOtsRlbAmount.isNotBlank() ||
+            npaOtsSanctionLimit.isNotBlank() || npaOtsScheme.isNotBlank() ||
             gender.isNotBlank() || dateOfBirth.isNotBlank() || panNumber.isNotBlank() ||
             addrVillage.isNotBlank() || gramPanchayat.isNotBlank() || tehsil.isNotBlank() ||
             addrDistrict.isNotBlank() || state.isNotBlank() || pinCode.isNotBlank() ||
@@ -1047,6 +1489,7 @@ data class VisitFormData(
         const val REPORT_OTS = "ots"
         const val REPORT_CKCC = "ckcc_renewal"
         const val REPORT_CKCC_OD = "ckcc_od"
+        const val REPORT_CKCC_NPA_OTS = "ckcc_npa_ots"
         const val REPORT_PRE_NPA = "pre_npa"
         const val REPORT_POST_NPA = "post_npa"
         const val REPORT_OTHER = "other"
@@ -1071,6 +1514,7 @@ data class VisitFormData(
             REPORT_OTS to "KRM OTS",
             REPORT_CKCC to "CKCC OD-2 Renewal",
             REPORT_CKCC_OD to "CKCC OD Field Report",
+            REPORT_CKCC_NPA_OTS to "CKCC NPA - KRM OTS Scheme",
             REPORT_RECOVERY to "Recovery Follow-up",
             REPORT_PRE_NPA to "Pre-NPA Verification",
             REPORT_POST_NPA to "Post-NPA Verification",
@@ -1087,6 +1531,20 @@ data class VisitFormData(
             "pending" to "Pending",
             "approved" to "Approved",
             "rejected" to "Rejected",
+        )
+
+        val NPA_OTS_BORROWER_RESPONSES = listOf(
+            "accepted" to "Accepted OTS",
+            "requested_time" to "Requested Time",
+            "financial_difficulty" to "Financial Difficulty",
+            "refused" to "Refused OTS",
+            "not_available" to "Not Available",
+        )
+
+        val NPA_OTS_SCHEMES = listOf(
+            "krm_ots" to "KRM OTS",
+            "general_ots" to "General OTS",
+            OTS_SCHEME_OTHER to "Other",
         )
 
         /** Section 4's Customer Response row. */
