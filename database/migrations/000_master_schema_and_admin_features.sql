@@ -1,52 +1,27 @@
 -- ============================================================================
--- D2 Recovery Solutions & Services - Loan Recovery Management System
--- MySQL 5.7+ / 8.0+ / MariaDB 10.3+ schema
+-- MASTER MIGRATION: Complete Database Schema with Admin Features
+-- ============================================================================
+-- This file contains:
+--   1. Complete initial database schema (from schema.sql)
+--   2. Admin feature migrations (BC Supervisor Visit + Report Type separation)
 --
--- Charset:   utf8mb4 / utf8mb4_unicode_ci
--- Engine:    InnoDB
+-- ============================================================================
+-- INSTRUCTIONS:
+-- ============================================================================
+-- This is an INSTALL SCRIPT, not a migration. It:
+--   - Destroys all existing data
+--   - Creates all tables from scratch
+--   - Includes all admin features
 --
--- PII POLICY
---   Mobile numbers and Aadhaar numbers are NEVER stored in plaintext.
---   Each has two columns:
---     *_enc   VARBINARY  -> AES-256-GCM ciphertext (app-layer, see Core/Crypto.php)
---     *_hash  CHAR(64)   -> HMAC-SHA256 of the normalised value, for exact-match search
---   A short masked form (e.g. "XXXXXX1234") is stored for display in list views so
---   that grids never need to decrypt 25+ rows per page.
+-- Use ONLY on a fresh/empty database during initial setup.
+-- For upgrades on existing databases, apply incremental migrations only.
 --
--- APPEND-ONLY POLICY
---   visit_reports and visit_history are append-only. There is no UPDATE path in the
---   application for either table. A new field visit always INSERTs a new row.
---
--- Designed for: 100+ branches, 1,000+ agents, 500,000+ customers, millions of visits.
---
--- ############################################################################
--- #                                                                          #
--- #  THIS FILE DESTROYS DATA. IT IS AN INSTALL SCRIPT, NOT A MIGRATION.       #
--- #                                                                          #
--- #  Every table below begins with DROP TABLE IF EXISTS, so importing this    #
--- #  file into a database that already holds records DELETES ALL OF THEM -    #
--- #  every customer, visit, promise, photo reference and user account.        #
--- #                                                                          #
--- #  Run it ONCE, on an empty database, when first installing.               #
--- #                                                                          #
--- #  Never run it to "refresh" or "repair" a live installation. To upgrade,   #
--- #  apply the migration named in the release notes. Take a backup first:     #
--- #      php /home/USER/public_html/cron/backup.php                          #
--- #                                                                          #
--- ############################################################################
 -- ============================================================================
 
 SET NAMES utf8mb4;
 SET SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO';
-
--- Off only so the tables below can be created in any order. Switched back on at
--- the very end of this file - leaving it off would let the rest of the session
--- (a phpMyAdmin tab, an operator's shell) write rows that break referential
--- integrity without any complaint.
 SET FOREIGN_KEY_CHECKS = 0;
 
--- ============================================================================
--- 1. RBAC
 -- ============================================================================
 
 DROP TABLE IF EXISTS `roles`;
@@ -1879,4 +1854,47 @@ INSERT INTO `score_weights` (`metric`, `weight`, `label`, `divisor`, `sort_order
 -- Restore foreign key enforcement for the remainder of this session.
 -- ============================================================================
 
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- ============================================================================
+-- ADMIN FEATURES: BC Supervisor Visit Management
+-- ============================================================================
+
+ALTER TABLE `bc_visits`
+ADD COLUMN `latitude` DECIMAL(10, 8) DEFAULT NULL COMMENT 'GPS latitude of visit location' AFTER `visiting_official_name`,
+ADD COLUMN `longitude` DECIMAL(11, 8) DEFAULT NULL COMMENT 'GPS longitude of visit location' AFTER `latitude`,
+ADD COLUMN `photo_path` VARCHAR(255) DEFAULT NULL COMMENT 'Path to visit photo (optional)' AFTER `longitude`;
+
+-- Create index for searching by location
+CREATE INDEX `idx_location` ON `bc_visits` (`latitude`, `longitude`);
+
+-- Update report_type ENUM to include new types
+ALTER TABLE `visit_reports` 
+MODIFY COLUMN `report_type` ENUM('recovery','ots','ckcc_renewal','ckcc_od','ckcc_npa_ots','bc_supervisor_visit','pre_npa','post_npa','other')
+NOT NULL DEFAULT 'recovery';
+
+-- Add BC Supervisor Visit specific columns
+ALTER TABLE `visit_reports`
+ADD COLUMN `bc_supervisor_name` VARCHAR(150) DEFAULT NULL COMMENT 'Name of supervisor conducting the visit' AFTER `supervisor_verified_at`,
+ADD COLUMN `bc_supervisor_bcbf_code` VARCHAR(20) DEFAULT NULL COMMENT 'BCBF Code of the supervisor' AFTER `bc_supervisor_name`,
+ADD COLUMN `supervised_agent_name` VARCHAR(150) DEFAULT NULL COMMENT 'Name of BC Supervisor/Agent being visited' AFTER `bc_supervisor_bcbf_code`,
+ADD COLUMN `supervised_agent_bc_code` VARCHAR(40) DEFAULT NULL COMMENT 'BC Code of the supervised agent' AFTER `supervised_agent_name`,
+ADD COLUMN `supervised_agent_iibf_number` VARCHAR(20) DEFAULT NULL COMMENT 'IIBF Certificate number of supervised agent' AFTER `supervised_agent_bc_code`,
+ADD COLUMN `supervisor_visit_qualification` VARCHAR(255) DEFAULT NULL COMMENT 'Educational qualification of visited agent' AFTER `supervised_agent_iibf_number`,
+ADD COLUMN `supervisor_visit_age` INT UNSIGNED DEFAULT NULL COMMENT 'Age of visited agent' AFTER `supervisor_visit_qualification`,
+ADD COLUMN `supervisor_visit_address` VARCHAR(500) DEFAULT NULL COMMENT 'Residential address of visited agent' AFTER `supervisor_visit_age`,
+ADD COLUMN `supervisor_visit_board_available` TINYINT(1) DEFAULT NULL COMMENT 'Board/materials available flag' AFTER `supervisor_visit_address`,
+ADD COLUMN `supervisor_visit_equipment_status` VARCHAR(255) DEFAULT NULL COMMENT 'Equipment condition assessment' AFTER `supervisor_visit_board_available`,
+ADD COLUMN `supervisor_visit_remuneration` VARCHAR(255) DEFAULT NULL COMMENT 'Remuneration details' AFTER `supervisor_visit_equipment_status`,
+ADD COLUMN `supervisor_visit_feedback` VARCHAR(1000) DEFAULT NULL COMMENT 'Feedback on agent performance' AFTER `supervisor_visit_remuneration`,
+ADD COLUMN `supervisor_visit_observation` VARCHAR(1000) DEFAULT NULL COMMENT 'General observations' AFTER `supervisor_visit_feedback`,
+ADD COLUMN `supervisor_visit_qr_code` VARCHAR(255) DEFAULT NULL COMMENT 'Path to QR code PDF with tracking info' AFTER `supervisor_visit_observation`;
+
+-- Create index for BC Supervisor Visit reports
+CREATE INDEX `idx_bc_supervisor_visit` ON `visit_reports` (`report_type`, `created_at`) 
+WHERE `report_type` = 'bc_supervisor_visit';
+
+-- ============================================================================
+-- Re-enable referential integrity checking
+-- ============================================================================
 SET FOREIGN_KEY_CHECKS = 1;
