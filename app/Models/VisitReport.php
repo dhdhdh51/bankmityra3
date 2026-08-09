@@ -151,12 +151,15 @@ final class VisitReport
      * pre-NPA worklist, the one that exists to stop an account going bad, unbuildable.
      */
     public const REPORT_TYPES = [
-        'ots'           => 'KRM OTS',
-        'ckcc_renewal'  => 'CKCC OD-2 Renewal',
-        'recovery'      => 'Recovery Follow-up',
-        'pre_npa'       => 'Pre-NPA Verification',
-        'post_npa'      => 'Post-NPA Verification',
-        'other'         => 'Other',
+        'ots'                 => 'KRM OTS',
+        'ckcc_renewal'        => 'CKCC OD-2 Renewal',
+        'ckcc_od'             => 'CKCC OD-2 Scheme',
+        'ckcc_npa_ots'        => 'CKCC NPA OTS (Krishak Rin Mochan)',
+        'bc_supervisor_visit' => 'BC Supervisor Field Visit',
+        'recovery'            => 'Recovery Follow-up',
+        'pre_npa'             => 'Pre-NPA Verification',
+        'post_npa'            => 'Post-NPA Verification',
+        'other'               => 'Other',
     ];
 
     public const OTS_SCHEMES = [
@@ -413,7 +416,7 @@ final class VisitReport
 
         return Paginator::fromQuery(
             "SELECT COUNT(*) FROM visit_reports vr WHERE {$clause}",
-            "SELECT vr.id, vr.report_type, vr.loan_account_id, vr.loan_account_number, vr.customer_name, vr.village, vr.address,
+            "SELECT vr.id, vr.report_type, vr.loan_account_id, vr.loan_account_number, vr.customer_name, vr.village,
                     vr.visit_date, vr.visit_time, vr.agent_name, vr.branch_name, vr.created_at,
                     vr.customer_met, vr.house_locked, vr.ready_to_pay, vr.not_ready,
                     vr.promise_amount, vr.promise_date, vr.outstanding_amount, vr.overdue_amount,
@@ -469,10 +472,16 @@ final class VisitReport
             $params[] = $loanType;
         }
 
+        $reportType = trim((string) ($filters['report_type'] ?? ''));
+        if ($reportType !== '') {
+            $where[] = 'vr.report_type = ?';
+            $params[] = $reportType;
+        }
+
         $search = trim((string) ($filters['search'] ?? ''));
         if ($search !== '') {
             $like = '%' . $search . '%';
-            $where[] = '(vr.loan_account_number LIKE ? OR vr.customer_name LIKE ? OR vr.address LIKE ?)';
+            $where[] = '(vr.loan_account_number LIKE ? OR vr.customer_name LIKE ? OR vr.village LIKE ?)';
             array_push($params, $like, $like, $like);
         }
 

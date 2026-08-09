@@ -341,6 +341,7 @@ final class ImportService
                             $customerData = [
                                 'name'                => mb_substr($values['customer_name'], 0, 150),
                                 'father_husband_name' => self::nullable($values['father_husband_name'], 150),
+                                'village'             => self::nullable($values['village'], 150),
                                 'address'             => self::nullable($values['address'], 500),
                                 'branch_id'           => $branchId,
                             ];
@@ -429,6 +430,7 @@ final class ImportService
                             'branch_id'           => $branchId,
                             'name'                => mb_substr($values['customer_name'], 0, 150),
                             'father_husband_name' => self::nullable($values['father_husband_name'], 150),
+                            'village'             => self::nullable($values['village'], 150),
                             'address'             => self::nullable($values['address'], 500),
                         ], $mobile, $aadhaar);
 
@@ -785,7 +787,7 @@ final class ImportService
                         'row'         => (string) $lineNumber,
                         'account'     => $account,
                         'name'        => $values['customer_name'],
-                        'address'     => $values['address'],
+                        'village'     => $values['village'],
                         'outstanding' => number_format(self::parseAmount($values['outstanding_amount']), 2),
                         'action'      => $exists ? 'Update' : 'New',
                     ];

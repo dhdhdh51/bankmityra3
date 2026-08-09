@@ -46,12 +46,14 @@ final class VisitController extends Controller
         $scoped = Auth::scopedBranchId();
 
         $filters = [
-            'branch_id' => $this->branchFilter($request),
-            'agent_id'  => $this->agentFilter($request),
-            'date_from' => $request->str('date_from'),
-            'date_to'   => $request->str('date_to'),
-            'loan_type' => $request->str('loan_type'),
-            'search'    => $request->str('search'),
+            'branch_id'   => $this->branchFilter($request),
+            'agent_id'    => $this->agentFilter($request),
+            'date_from'   => $request->str('date_from'),
+            'date_to'     => $request->str('date_to'),
+            'village'     => $request->str('village'),
+            'loan_type'   => $request->str('loan_type'),
+            'report_type' => $request->str('report_type'),
+            'search'      => $request->str('search'),
         ];
 
         $visits = VisitReport::paginate($filters, $request->page(), $this->perPage($request));
@@ -62,6 +64,7 @@ final class VisitController extends Controller
             'filters'   => $filters,
             'branches'  => Branch::options($scoped),
             'agents'    => User::agents($scoped ?? ($filters['branch_id'] ?? null)),
+            'villages'  => LoanAccount::villages($scoped),
             'loanTypes' => LoanAccount::loanTypes($scoped),
         ]);
     }
@@ -328,6 +331,19 @@ final class VisitController extends Controller
         $photos = VisitReport::photos($id);
         $documents = VisitReport::documents($id);
 
+        // For CKCC OD-2 Renewal reports, do NOT show OTS section
+        if (($report['report_type'] ?? '') === 'ckcc_renewal') {
+            $ots = null;
+        }
+
+        // For CKCC NPA OTS reports, ensure we show OTS section
+        if (($report['report_type'] ?? '') === 'ckcc_npa_ots') {
+            // Force OTS to display for NPA OTS reports
+            if ($ots === null) {
+                $ots = [];  // Show as empty section rather than "not applicable"
+            }
+        }
+
         // The agency's own name, not the bank's.
         //
         // This used to fall back to `bank_name`, which put the client bank at the top of a
@@ -473,6 +489,53 @@ final class VisitController extends Controller
             self::pdfOptions(VisitReport::ASSET_CLASSIFICATIONS, $report['asset_classification'] ?? null),
             3
         );
+
+        // ---- 3a. BC Supervisor Field Visit details --------------------------
+        //
+        // Only report_type = bc_supervisor_visit carries these columns. Printed as its
+        // own band, right after the loan/account section and before KRM OTS, so a
+        // supervisor's visit to a BC Agent never gets mistaken for a settlement or
+        // renewal call further down the same document.
+        if (($report['report_type'] ?? '') === 'bc_supervisor_visit') {
+            $pdf->groupLabel('BC Supervisor Field Visit Details');
+            $pdf->formFields([
+                'Supervisor Name'        => $report['bc_supervisor_name'] ?: '-',
+                'Supervisor BCBF Code'   => $report['bc_supervisor_bcbf_code'] ?: '-',
+                'Supervised Agent Name'  => $report['supervised_agent_name'] ?: '-',
+                'Supervised Agent BC Code' => $report['supervised_agent_bc_code'] ?: '-',
+                'IIBF Certificate No.'   => $report['supervised_agent_iibf_number'] ?: '-',
+                'Qualification'          => $report['supervisor_visit_qualification'] ?: '-',
+                'Age'                    => $report['supervisor_visit_age'] ?: '-',
+            ], 2);
+            $pdf->formFields([
+                'Residential Address' => $report['supervisor_visit_address'] ?: '-',
+            ], 1);
+            $pdf->groupLabel('Board / Materials Available');
+            $pdf->checkboxGrid(self::pdfOptions(
+                ['1' => 'Yes', '0' => 'No'],
+                isset($report['supervisor_visit_board_available'])
+                    ? (string) (int) $report['supervisor_visit_board_available']
+                    : null
+            ), 2);
+            $pdf->formFields([
+                'Equipment Status' => $report['supervisor_visit_equipment_status'] ?: '-',
+                'Remuneration'      => $report['supervisor_visit_remuneration'] ?: '-',
+            ], 2);
+            $pdf->groupLabel('Feedback on Agent Performance');
+            $pdf->paragraph(
+                ($report['supervisor_visit_feedback'] ?? '') === ''
+                    ? 'No feedback recorded.' : (string) $report['supervisor_visit_feedback'],
+                9.0,
+                '#1c2128'
+            );
+            $pdf->groupLabel('General Observations');
+            $pdf->paragraph(
+                ($report['supervisor_visit_observation'] ?? '') === ''
+                    ? 'No observations recorded.' : (string) $report['supervisor_visit_observation'],
+                9.0,
+                '#1c2128'
+            );
+        }
 
         // ---- 4. KRM OTS details ---------------------------------------------
         //

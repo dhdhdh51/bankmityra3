@@ -4,6 +4,7 @@
  * @var array<string,mixed>       $filters
  * @var list<array<string,mixed>> $branches
  * @var list<array<string,mixed>> $agents
+ * @var list<string>              $villages
  * @var list<string>              $loanTypes
  */
 ?>
@@ -22,7 +23,7 @@
                 <div>
                     <label class="form-label" for="v-search">Search</label>
                     <input type="search" class="form-control" id="v-search" name="search"
-                           value="<?= e($filters['search']) ?>" placeholder="Account no, customer, address">
+                           value="<?= e($filters['search']) ?>" placeholder="Account no, customer, village">
                 </div>
 
                 <?php if (count($branches) > 1): ?>
@@ -65,6 +66,31 @@
                            value="<?= e($filters['date_to']) ?>">
                 </div>
 
+                <div>
+                    <label class="form-label" for="v-village">Village</label>
+                    <select class="form-select" id="v-village" name="village" data-auto-submit>
+                        <option value="">All villages</option>
+                        <?php foreach ($villages as $village): ?>
+                            <option value="<?= e($village) ?>" <?= $filters['village'] === $village ? 'selected' : '' ?>>
+                                <?= e($village) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="form-label" for="v-report-type">Report type</label>
+                    <select class="form-select" id="v-report-type" name="report_type" data-auto-submit>
+                        <option value="">All report types</option>
+                        <?php foreach (\App\Models\VisitReport::REPORT_TYPES as $typeKey => $typeLabel): ?>
+                            <option value="<?= e($typeKey) ?>"
+                                <?= ($filters['report_type'] ?? '') === $typeKey ? 'selected' : '' ?>>
+                                <?= e($typeLabel) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
                 <div class="filter-actions">
                     <button type="submit" class="btn btn-primary"><?= icon('filter') ?> Filter</button>
                     <a href="<?= e(url('/visits')) ?>" class="btn btn-outline-secondary">Reset</a>
@@ -87,9 +113,10 @@
                 <thead>
                     <tr>
                         <th>Visit date</th>
+                        <th>Report type</th>
                         <th>Loan account</th>
                         <th>Customer</th>
-                        <th>Address</th>
+                        <th>Village</th>
                         <th>Agent</th>
                         <th>Contact</th>
                         <th class="text-end">Promise</th>
@@ -107,6 +134,11 @@
                                 </div>
                             </td>
                             <td class="nowrap">
+                                <span class="lrms-badge badge-followup" style="font-size:.6875rem">
+                                    <?= e(enum_label(\App\Models\VisitReport::REPORT_TYPES, $visit['report_type'] ?? null)) ?>
+                                </span>
+                            </td>
+                            <td class="nowrap">
                                 <a href="<?= e(url('/customers/' . (int) $visit['loan_account_id'])) ?>"
                                    class="font-mono" style="font-size:.75rem">
                                     <?= e($visit['loan_account_number']) ?>
@@ -116,7 +148,7 @@
                                 </div>
                             </td>
                             <td style="font-weight:550"><?= e($visit['customer_name']) ?></td>
-                            <td style="font-size:.8125rem"><?= nullable($visit['address']) ?></td>
+                            <td style="font-size:.8125rem"><?= nullable($visit['village']) ?></td>
                             <td style="font-size:.8125rem"><?= e($visit['agent_name']) ?></td>
                             <td>
                                 <?php if ((int) $visit['customer_met'] === 1): ?>

@@ -229,7 +229,7 @@ $unread = $unreadNotifications ?? 0;
                         <?= icon('search') ?>
                     </span>
                     <input type="search" name="search" class="form-control ps-5"
-                           placeholder="Search account no, name, mobile, Aadhaar, address"
+                           placeholder="Search account no, name, mobile, Aadhaar, village"
                            value="<?= e($_GET['search'] ?? '') ?>" aria-label="Search customers">
                 </div>
             </form>

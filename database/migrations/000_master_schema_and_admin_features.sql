@@ -1,4 +1,31 @@
 -- ============================================================================
+-- MASTER MIGRATION: Complete Database Schema with Admin Features
+-- ============================================================================
+-- This file contains the COMPLETE, CORRECT database schema, including:
+--   1. All base tables (roles, branches, users, customers, visits, etc.)
+--   2. BC Supervisor Visit feature (bc_visits table with GPS + photo columns)
+--   3. Report type separation (CKCC OD-2 / CKCC NPA OTS / BC Supervisor Visit)
+--
+-- FIX NOTE: A previous version of this file was built from an outdated
+-- schema.sql that did NOT contain the bc_visits table, then tried to run
+-- 'ALTER TABLE bc_visits ADD COLUMN ...' against a table that was never
+-- created -> SQL failed with 'Table bc_visits doesn't exist'.
+-- This version is rebuilt from the correct, complete schema-admin.sql where
+-- bc_visits and the visit_reports columns/ENUM are already defined correctly,
+-- so no separate ALTER TABLE migrations are needed.
+--
+-- ============================================================================
+-- INSTRUCTIONS:
+-- ============================================================================
+-- This is an INSTALL SCRIPT, not an incremental migration. It:
+--   - Destroys all existing data (every table starts with DROP TABLE IF EXISTS)
+--   - Creates all tables from scratch, including admin features
+--
+-- Use ONLY on a fresh/empty database during initial setup.
+-- NEVER run this against a live database with existing data.
+-- ============================================================================
+
+-- ============================================================================
 -- D2 Recovery Solutions & Services - Loan Recovery Management System
 -- MySQL 5.7+ / 8.0+ / MariaDB 10.3+ schema
 --
@@ -516,7 +543,7 @@ CREATE TABLE `visit_reports` (
   -- 'pre_npa' and 'post_npa' are not settlement or renewal work: they are the same
   -- doorstep verification done before an account slips and after it has, and they
   -- were being filed as plain recovery calls because there was nothing else to pick.
-  `report_type`          ENUM('recovery','ots','ckcc_renewal','pre_npa','post_npa','other')
+  `report_type`          ENUM('recovery','ots','ckcc_renewal','ckcc_od','ckcc_npa_ots','bc_supervisor_visit','pre_npa','post_npa','other')
                            NOT NULL DEFAULT 'recovery',
   `report_type_other_text` VARCHAR(150) DEFAULT NULL COMMENT 'when Case Type is Other',
 
@@ -705,6 +732,22 @@ CREATE TABLE `visit_reports` (
   `supervisor_designation` VARCHAR(100) DEFAULT NULL,
   `supervisor_employee_id` VARCHAR(40)  DEFAULT NULL COMMENT 'Employee ID / DRA ID',
   `supervisor_verified_at` DATE         DEFAULT NULL,
+
+  -- ---- BC Supervisor Field Visit (report_type = bc_supervisor_visit) ------
+  `bc_supervisor_name`           VARCHAR(150) DEFAULT NULL COMMENT 'Name of supervisor conducting the visit',
+  `bc_supervisor_bcbf_code`      VARCHAR(20)  DEFAULT NULL COMMENT 'BCBF Code of the supervisor',
+  `supervised_agent_name`        VARCHAR(150) DEFAULT NULL COMMENT 'Name of BC Supervisor/Agent being visited',
+  `supervised_agent_bc_code`     VARCHAR(40)  DEFAULT NULL COMMENT 'BC Code of the supervised agent',
+  `supervised_agent_iibf_number` VARCHAR(20)  DEFAULT NULL COMMENT 'IIBF Certificate number of supervised agent',
+  `supervisor_visit_qualification` VARCHAR(255) DEFAULT NULL COMMENT 'Educational qualification of visited agent',
+  `supervisor_visit_age`         INT UNSIGNED DEFAULT NULL COMMENT 'Age of visited agent',
+  `supervisor_visit_address`     VARCHAR(500) DEFAULT NULL COMMENT 'Residential address of visited agent',
+  `supervisor_visit_board_available` TINYINT(1) DEFAULT NULL COMMENT 'Board/materials available flag',
+  `supervisor_visit_equipment_status` VARCHAR(255) DEFAULT NULL COMMENT 'Equipment condition assessment',
+  `supervisor_visit_remuneration` VARCHAR(255) DEFAULT NULL COMMENT 'Remuneration details',
+  `supervisor_visit_feedback`    VARCHAR(1000) DEFAULT NULL COMMENT 'Feedback on agent performance',
+  `supervisor_visit_observation` VARCHAR(1000) DEFAULT NULL COMMENT 'General observations',
+  `supervisor_visit_qr_code`     VARCHAR(255) DEFAULT NULL COMMENT 'Path to QR code PDF with tracking info',
 
   -- ---- Meta ---------------------------------------------------------------
   `source`       ENUM('android','web') NOT NULL DEFAULT 'android',
@@ -1590,6 +1633,55 @@ CREATE TABLE `sss_enrollment` (
   KEY `idx_sss_branch_date` (`branch_id`, `enrollment_date`),
   CONSTRAINT `fk_sss_agent`  FOREIGN KEY (`agent_id`)  REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_sss_branch` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- BC SUPERVISOR VISIT FORM
+-- ============================================================================
+-- BC Supervisor visit reports, capturing BC Agent performance and compliance during visits.
+-- Supervisors visit BC Agents to assess their performance, equipment, documentation, and remuneration.
+DROP TABLE IF EXISTS `bc_visits`;
+CREATE TABLE `bc_visits` (
+  `id`                      BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id`                 INT UNSIGNED DEFAULT NULL COMMENT 'FK to users.id (BC Agent visited)',
+  `supervisor_id`           INT UNSIGNED NOT NULL COMMENT 'FK to users.id (Supervisor who visited)',
+  `visit_date`              DATE         NOT NULL,
+  `visit_time`              TIME         DEFAULT NULL,
+
+  -- BC Agent details (auto-populated from users table, but stored for historical record)
+  `bca_name`                VARCHAR(150) DEFAULT NULL COMMENT 'BC Agent name',
+  `bc_code`                 VARCHAR(40)  DEFAULT NULL COMMENT 'BC Code',
+  `cbc_name`                VARCHAR(150) DEFAULT NULL COMMENT 'SP/CBC name',
+  `branch_name`             VARCHAR(150) DEFAULT NULL COMMENT 'Agent''s branch name',
+  `iibf_certificate_no`     VARCHAR(40)  DEFAULT NULL COMMENT 'IIBF certificate number',
+  `ssa_non_ssa`             VARCHAR(150) DEFAULT NULL COMMENT 'SSA or Non-SSA designation',
+  `board_link_br_name`      VARCHAR(150) DEFAULT NULL COMMENT 'Link branch name',
+
+  -- Supervisor observations and assessment
+  `qualification`           VARCHAR(255) DEFAULT NULL COMMENT 'Agent''s educational qualification',
+  `age`                     INT UNSIGNED DEFAULT NULL COMMENT 'Agent''s age',
+  `address_contact`         VARCHAR(500) DEFAULT NULL COMMENT 'Agent''s residential address',
+  `board_available`         TINYINT(1)   DEFAULT NULL COMMENT 'Board/materials available',
+  `equipment_status`        VARCHAR(255) DEFAULT NULL COMMENT 'Equipment status and condition',
+  `remuneration`            VARCHAR(255) DEFAULT NULL COMMENT 'Remuneration details',
+  `feedback`                VARCHAR(1000) DEFAULT NULL COMMENT 'Supervisor feedback',
+  `observation`             VARCHAR(1000) DEFAULT NULL COMMENT 'General observations',
+  `visiting_official_name`  VARCHAR(150) DEFAULT NULL COMMENT 'Name of visiting official',
+
+  -- Location and photo
+  `latitude`                DECIMAL(10, 8) DEFAULT NULL COMMENT 'GPS latitude of visit location',
+  `longitude`               DECIMAL(11, 8) DEFAULT NULL COMMENT 'GPS longitude of visit location',
+  `photo_path`              VARCHAR(255) DEFAULT NULL COMMENT 'Path to visit photo (optional)',
+
+  `created_at`              DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`              DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  PRIMARY KEY (`id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_supervisor_id` (`supervisor_id`),
+  KEY `idx_visit_date` (`visit_date`),
+  CONSTRAINT `fk_bc_visit_user`       FOREIGN KEY (`user_id`)       REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_bc_visit_supervisor` FOREIGN KEY (`supervisor_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Scorecard weights, editable rather than compiled in, so a region can weight
