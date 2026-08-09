@@ -134,7 +134,7 @@ $unread = $unreadNotifications ?? 0;
                 </a>
             <?php endif; ?>
 
-            <?php if (can('scorecard.view') || can('bc_targets.view') || can('sss.view') || can('bc_visit.view')): ?>
+            <?php if (can('scorecard.view') || can('bc_targets.view') || can('sss.view')): ?>
                 <div class="lrms-nav-label">BC Performance</div>
 
                 <?php if (can('scorecard.view')): ?>
@@ -152,12 +152,6 @@ $unread = $unreadNotifications ?? 0;
                 <?php if (can('sss.view')): ?>
                     <a class="lrms-nav-item<?= active_nav('/bc/sss', $currentPath) ?>" href="<?= e(url('/bc/sss')) ?>">
                         <?= icon('handshake') ?> SSS Enrolment
-                    </a>
-                <?php endif; ?>
-
-                <?php if (can('bc_visit.view')): ?>
-                    <a class="lrms-nav-item<?= active_nav('/bc/visit', $currentPath) ?>" href="<?= e(url('/bc/visit')) ?>">
-                        <?= icon('clipboard') ?> BC Visit
                     </a>
                 <?php endif; ?>
             <?php endif; ?>
@@ -235,7 +229,7 @@ $unread = $unreadNotifications ?? 0;
                         <?= icon('search') ?>
                     </span>
                     <input type="search" name="search" class="form-control ps-5"
-                           placeholder="Search account no, name, mobile, Aadhaar, address"
+                           placeholder="Search account no, name, mobile, Aadhaar, village"
                            value="<?= e($_GET['search'] ?? '') ?>" aria-label="Search customers">
                 </div>
             </form>

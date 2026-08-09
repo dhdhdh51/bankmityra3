@@ -303,10 +303,7 @@
                             var form = document.querySelector('form[data-no-double-submit]');
                             if (!form) return;
                             // On form submit, build hidden inputs from the column-first dropdowns
-                            form.addEventListener('submit', function(e) {
-                                // Prevent default submission temporarily
-                                e.preventDefault();
-                                
+                            form.addEventListener('submit', function() {
                                 var container = document.getElementById('columnMapHidden');
                                 container.innerHTML = '';
                                 var selects = form.querySelectorAll('.lrms-column-assign');
@@ -319,7 +316,6 @@
                                         map[field] = colIndex;
                                     }
                                 });
-                                
                                 // Create hidden inputs as column_map[field] = index
                                 for (var field in map) {
                                     var input = document.createElement('input');
@@ -328,15 +324,6 @@
                                     input.value = map[field];
                                     container.appendChild(input);
                                 }
-                                
-                                // Debug: log the mapping being sent
-                                console.log('Column mapping being sent:', map);
-                                console.log('Hidden inputs created:', container.innerHTML);
-                                
-                                // Now submit the form
-                                // Remove this listener to avoid infinite loop
-                                form.removeEventListener('submit', arguments.callee);
-                                form.submit();
                             });
                         });
                         </script>
@@ -355,14 +342,9 @@
                         <?php endif; ?>
 
                         <?php if ($canUpload): ?>
-                            <button type="submit" class="btn btn-primary" id="confirmImportBtn">
+                            <button type="submit" class="btn btn-primary">
                                 <?= icon('check') ?> Import with this mapping
                             </button>
-                            <noscript>
-                                <div class="alert alert-warning mt-2">
-                                    JavaScript is disabled. The mapping may not work correctly.
-                                </div>
-                            </noscript>
                         <?php endif; ?>
                     </form>
 
@@ -409,7 +391,7 @@
                                     <thead>
                                         <tr>
                                             <th>Row</th><th>Account</th><th>Customer</th>
-                                            <th>Address</th><th class="text-end">Outstanding</th><th>Action</th>
+                                            <th>Village</th><th class="text-end">Outstanding</th><th>Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -418,7 +400,7 @@
                                                 <td class="text-muted" style="font-size:.75rem"><?= e($row['row']) ?></td>
                                                 <td class="font-mono" style="font-size:.75rem"><?= e($row['account']) ?></td>
                                                 <td style="font-size:.8125rem"><?= e($row['name']) ?></td>
-                                                <td style="font-size:.8125rem"><?= e($row['address']) ?></td>
+                                                <td style="font-size:.8125rem"><?= e($row['village']) ?></td>
                                                 <td class="num"><?= e($row['outstanding']) ?></td>
                                                 <td>
                                                     <span class="lrms-badge <?= $row['action'] === 'New' ? 'badge-visited' : 'badge-promise' ?>">

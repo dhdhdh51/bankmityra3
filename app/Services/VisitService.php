@@ -54,7 +54,7 @@ final class VisitService
      * renewal work - and before they existed here they were filed as plain recovery
      * calls, which made the pre-NPA worklist unbuildable from the reports themselves.
      */
-    public const REPORT_TYPES = ['recovery', 'ots', 'ckcc_renewal', 'pre_npa', 'post_npa', 'other'];
+    public const REPORT_TYPES = ['recovery', 'ots', 'ckcc_renewal', 'ckcc_od', 'ckcc_npa_ots', 'bc_supervisor_visit', 'pre_npa', 'post_npa', 'other'];
 
     /**
      * @param array<string,mixed> $input Validated form/API payload.
@@ -319,6 +319,21 @@ final class VisitService
                 'supervisor_designation' => self::str($input['supervisor_designation'] ?? null, 100),
                 'supervisor_employee_id' => self::str($input['supervisor_employee_id'] ?? null, 40),
                 'supervisor_verified_at' => self::nullableDate($input['supervisor_verified_at'] ?? null),
+
+                // ---- BC Supervisor Field Visit ---------------------------
+                'bc_supervisor_name' => self::str($input['bc_supervisor_name'] ?? null, 150),
+                'bc_supervisor_bcbf_code' => self::str($input['bc_supervisor_bcbf_code'] ?? null, 20),
+                'supervised_agent_name' => self::str($input['supervised_agent_name'] ?? null, 150),
+                'supervised_agent_bc_code' => self::str($input['supervised_agent_bc_code'] ?? null, 40),
+                'supervised_agent_iibf_number' => self::str($input['supervised_agent_iibf_number'] ?? null, 20),
+                'supervisor_visit_qualification' => self::str($input['supervisor_visit_qualification'] ?? null, 255),
+                'supervisor_visit_age' => self::nullableInt($input['supervisor_visit_age'] ?? null),
+                'supervisor_visit_address' => self::str($input['supervisor_visit_address'] ?? null, 500),
+                'supervisor_visit_board_available' => self::flag($input['supervisor_visit_board_available'] ?? null),
+                'supervisor_visit_equipment_status' => self::str($input['supervisor_visit_equipment_status'] ?? null, 255),
+                'supervisor_visit_remuneration' => self::str($input['supervisor_visit_remuneration'] ?? null, 255),
+                'supervisor_visit_feedback' => self::text($input['supervisor_visit_feedback'] ?? null),
+                'supervisor_visit_observation' => self::text($input['supervisor_visit_observation'] ?? null),
 
                 // Where the agent was standing, when the app reports it and the
                 // agent has consented. See geo() - a report is never rejected over
@@ -1166,6 +1181,15 @@ final class VisitService
             return checkdate($m, $d, $y) ? $raw : null;
         }
         return ImportService::parseDate($raw);
+    }
+
+    private static function nullableInt(mixed $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        $parsed = intval($value);
+        return $parsed > 0 ? $parsed : null;
     }
 
     /** Occupation must match the ENUM, else store NULL rather than fail the insert. */

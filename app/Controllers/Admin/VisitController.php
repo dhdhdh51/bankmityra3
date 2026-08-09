@@ -50,6 +50,7 @@ final class VisitController extends Controller
             'agent_id'  => $this->agentFilter($request),
             'date_from' => $request->str('date_from'),
             'date_to'   => $request->str('date_to'),
+            'village'   => $request->str('village'),
             'loan_type' => $request->str('loan_type'),
             'search'    => $request->str('search'),
         ];
@@ -62,6 +63,7 @@ final class VisitController extends Controller
             'filters'   => $filters,
             'branches'  => Branch::options($scoped),
             'agents'    => User::agents($scoped ?? ($filters['branch_id'] ?? null)),
+            'villages'  => LoanAccount::villages($scoped),
             'loanTypes' => LoanAccount::loanTypes($scoped),
         ]);
     }
@@ -327,6 +329,19 @@ final class VisitController extends Controller
         $ckcc = VisitReport::ckccDetails($id);
         $photos = VisitReport::photos($id);
         $documents = VisitReport::documents($id);
+
+        // For CKCC OD-2 Renewal reports, do NOT show OTS section
+        if (($report['report_type'] ?? '') === 'ckcc_renewal') {
+            $ots = null;
+        }
+
+        // For CKCC NPA OTS reports, ensure we show OTS section
+        if (($report['report_type'] ?? '') === 'ckcc_npa_ots') {
+            // Force OTS to display for NPA OTS reports
+            if ($ots === null) {
+                $ots = [];  // Show as empty section rather than "not applicable"
+            }
+        }
 
         // The agency's own name, not the bank's.
         //

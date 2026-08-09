@@ -12,6 +12,7 @@ declare(strict_types=1);
 use App\Controllers\Admin\AuthController;
 use App\Controllers\Admin\BackupController;
 use App\Controllers\Admin\BcTargetController;
+use App\Controllers\Admin\BcVisitController;
 use App\Controllers\Admin\BranchController;
 use App\Controllers\Admin\CustomFieldController;
 use App\Controllers\Admin\CustomerController;
@@ -25,7 +26,6 @@ use App\Controllers\Admin\ReportController;
 use App\Controllers\Admin\RoleController;
 use App\Controllers\Admin\ScorecardController;
 use App\Controllers\Admin\SettingsController;
-use App\Controllers\Admin\BcVisitController;
 use App\Controllers\Admin\SssController;
 use App\Controllers\Admin\TrackingController;
 use App\Controllers\Admin\UserController;
@@ -128,15 +128,17 @@ return static function (Router $router): void {
     $router->form('/bc/targets/{id}/edit', [BcTargetController::class, 'edit']);
     $router->post('/bc/targets/{id}/delete', [BcTargetController::class, 'delete']);
 
+    $router->get ('/bc/visit', [BcVisitController::class, 'index']);
+    $router->form('/bc/visit/create', [BcVisitController::class, 'create']);
+    $router->get ('/bc/visit/{id}', [BcVisitController::class, 'show']);
+    $router->form('/bc/visit/{id}/edit', [BcVisitController::class, 'edit']);
+    $router->post('/bc/visit/{id}/delete', [BcVisitController::class, 'delete']);
+    $router->get ('/bc/visit/api/agent/{id}', [BcVisitController::class, 'apiAgentLoad']);
+
     $router->get ('/bc/sss', [SssController::class, 'index']);
     $router->form('/bc/sss/create', [SssController::class, 'create']);
     $router->form('/bc/sss/{id}/edit', [SssController::class, 'edit']);
     $router->post('/bc/sss/{id}/delete', [SssController::class, 'delete']);
-
-    $router->get ('/bc/visit', [BcVisitController::class, 'index']);
-    $router->form('/bc/visit/create', [BcVisitController::class, 'create']);
-    $router->form('/bc/visit/{id}/edit', [BcVisitController::class, 'edit']);
-    $router->post('/bc/visit/{id}/delete', [BcVisitController::class, 'delete']);
 
     // Registered before the bare path so /export is never read as a route param.
     $router->get('/bc/scorecard/export', [ScorecardController::class, 'export']);

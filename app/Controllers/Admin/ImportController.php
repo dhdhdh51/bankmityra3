@@ -549,25 +549,14 @@ final class ImportController extends Controller
     private function columnOverrides(Request $request): array
     {
         $raw = $_POST['column_map'] ?? null;
-        
-        // Debug logging via activity log
-        \App\Core\Logger::activity(
-            'column_mapping_received',
-            'Import',
-            'Column mapping: ' . json_encode(['has_data' => is_array($raw), 'count' => is_array($raw) ? count($raw) : 0])
-        );
-        
         if (!is_array($raw)) {
             return [];
         }
 
         $fields = ColumnDetector::fields();
         $overrides = [];
-        $invalid = [];
-        
         foreach ($raw as $field => $index) {
             if (!is_string($field) || !isset($fields[$field]) || !is_scalar($index)) {
-                $invalid[] = $field;
                 continue;
             }
             $value = (string) $index;
@@ -575,18 +564,10 @@ final class ImportController extends Controller
                 continue;   // "detect automatically"
             }
             if (!is_numeric($value)) {
-                $invalid[] = $field . '=' . $value;
                 continue;
             }
             $overrides[$field] = (int) $value;
         }
-        
-        // Log the final result
-        \App\Core\Logger::activity(
-            'column_mapping_processed',
-            'Import',
-            sprintf('Processed %d mappings, %d invalid', count($overrides), count($invalid))
-        );
 
         return $overrides;
     }

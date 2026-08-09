@@ -1,111 +1,151 @@
 <?php
 /**
- * @var \App\Core\Paginator $visits
- * @var string              $search
- * @var string              $sortBy
- * @var string              $sortDir
+ * BC Supervisor Visits List
+ *
+ * @var App\Core\Paginator $visits
+ * @var string $search
+ * @var int|null $userId
+ * @var int|null $supervisorId
+ * @var int|null $branchId
+ * @var string $dateFrom
+ * @var string $dateTo
+ * @var list<array<string,mixed>> $branches
+ * @var list<array<string,mixed>> $agents
+ * @var list<array<string,mixed>> $supervisors
+ * @var string $sortBy
+ * @var string $sortDir
+ * @var array<string,mixed> $old
+ * @var array<string,list<string>> $errors
  */
+
+$sortUrl = static function (string $field): string {
+    global $sortBy, $sortDir;
+    $newDir = ($sortBy === $field && $sortDir === 'ASC') ? 'DESC' : 'ASC';
+    return url('/bc/visit?sort=' . e($field) . '&order=' . e($newDir));
+};
+
+$sortIcon = static function (string $field): string {
+    global $sortBy, $sortDir;
+    if ($sortBy !== $field) {
+        return '';
+    }
+    return $sortDir === 'ASC'
+        ? ' <i class="fas fa-arrow-up" style="font-size:.75rem"></i>'
+        : ' <i class="fas fa-arrow-down" style="font-size:.75rem"></i>';
+};
 ?>
 
 <div class="lrms-page-head">
     <div>
-        <h1>BC Visits</h1>
-        <p>BC Supervisor visits to BC Agent outlets</p>
+        <h1>BC Supervisor Visits</h1>
+        <p>Supervisor visit reports for BC Agents assessment</p>
     </div>
-    <?php if (can('bc_visit.manage')): ?>
-        <a href="<?= e(url('/bc/visit/create')) ?>" class="btn btn-primary btn-sm">
-            <?= icon('plus') ?> Record Visit
+    <div>
+        <a href="<?= e(url('/bc/visit/create')) ?>" class="btn btn-primary">
+            <i class="fas fa-plus"></i>
+            New Visit
         </a>
-    <?php endif; ?>
-</div>
-
-<div class="lrms-card mb-3">
-    <div class="lrms-card-body">
-        <form method="get" action="<?= e(url('/bc/visit')) ?>">
-            <?= sort_hidden($sortBy, $sortDir) ?>
-            <div class="lrms-filters">
-                <div>
-                    <label class="form-label" for="v-search">Search</label>
-                    <input type="search" class="form-control" id="v-search" name="search"
-                           value="<?= e($search) ?>" placeholder="BCA name, branch, CBC, visiting official">
-                </div>
-                <div class="filter-actions">
-                    <button type="submit" class="btn btn-primary"><?= icon('filter') ?> Filter</button>
-                    <a href="<?= e(url('/bc/visit')) ?>" class="btn btn-outline-secondary">Reset</a>
-                </div>
-            </div>
-        </form>
     </div>
 </div>
 
-<div class="lrms-card">
-    <?php if ($visits->isEmpty()): ?>
-        <?= \App\Core\View::partial('partials/empty', [
-            'heading'     => 'No BC visits recorded',
-            'message'     => 'Record a BC Supervisor visit to a BC Agent outlet.',
-            'iconName'    => 'clipboard',
-            'actionLabel' => can('bc_visit.manage') ? 'Record Visit' : null,
-            'actionUrl'   => can('bc_visit.manage') ? url('/bc/visit/create') : null,
-        ]) ?>
-    <?php else: ?>
-        <div class="lrms-table-wrap">
-            <table class="lrms-table">
-                <thead>
-                    <tr>
-                        <th><?= sort_link('BCA Name', 'bca_name', $sortBy, $sortDir) ?></th>
-                        <th><?= sort_link('Branch', 'branch_name', $sortBy, $sortDir) ?></th>
-                        <th><?= sort_link('Visit Date', 'visit_date', $sortBy, $sortDir) ?></th>
-                        <th><?= sort_link('Observation', 'observation', $sortBy, $sortDir) ?></th>
-                        <th>Visiting Official</th>
-                        <th><?= sort_link('Created', 'created_at', $sortBy, $sortDir) ?></th>
-                        <th class="text-end">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($visits->items as $visit): ?>
-                        <tr>
-                            <td style="font-weight:550"><?= e((string) $visit['bca_name']) ?></td>
-                            <td style="font-size:.8125rem"><?= e((string) $visit['branch_name']) ?></td>
-                            <td style="font-size:.8125rem"><?= $visit['visit_date'] ? fmt_date($visit['visit_date']) : '-' ?></td>
-                            <td>
-                                <?php if ($visit['observation']): ?>
-                                    <span class="lrms-badge <?php
-                                        echo match($visit['observation']) {
-                                            'excellent' => 'badge-visited',
-                                            'good' => 'badge-visited',
-                                            'satisfactory' => 'badge-pending',
-                                            'poor' => 'badge-closed',
-                                            default => ''
-                                        };
-                                    ?>"><?= e(ucfirst((string) $visit['observation'])) ?></span>
-                                <?php else: ?>
-                                    -
-                                <?php endif; ?>
-                            </td>
-                            <td style="font-size:.8125rem"><?= nullable($visit['visiting_official_name']) ?></td>
-                            <td style="font-size:.8125rem"><?= fmt_date($visit['created_at']) ?></td>
-                            <td class="text-end nowrap">
-                                <?php if (can('bc_visit.manage')): ?>
-                                    <a href="<?= e(url('/bc/visit/' . (int) $visit['id'] . '/edit')) ?>"
-                                       class="btn btn-ghost btn-sm btn-icon" title="Edit"
-                                       data-bs-toggle="tooltip"><?= icon('edit') ?></a>
-                                    <form method="post" class="d-inline m-0"
-                                          action="<?= e(url('/bc/visit/' . (int) $visit['id'] . '/delete')) ?>"
-                                          data-confirm="Delete this BC visit record for <?= e((string) $visit['bca_name']) ?>?">
-                                        <?= csrf_field() ?>
-                                        <button type="submit" class="btn btn-ghost btn-sm btn-icon text-danger"
-                                                title="Delete" data-bs-toggle="tooltip"><?= icon('trash') ?></button>
-                                    </form>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+<div class="lrms-filters">
+    <form method="get" action="<?= e(url('/bc/visit')) ?>" class="row g-2">
+        <div class="col-lg-3">
+            <input type="text" class="form-control form-control-sm" name="search"
+                   value="<?= e($search) ?>"
+                   placeholder="Search by name, code, employee ID&hellip;">
         </div>
 
-        <div class="lrms-card-foot">
-            <?= \App\Core\View::partial('partials/pagination', ['paginator' => $visits, 'label' => 'visits']) ?>
+        <div class="col-lg-2">
+            <select class="form-select form-select-sm" name="branch_id">
+                <option value="">All branches</option>
+                <?php foreach ($branches as $branch): ?>
+                    <option value="<?= (int) $branch['id'] ?>"
+                        <?= ($branchId ?? 0) === (int) $branch['id'] ? 'selected' : '' ?>>
+                        <?= e((string) $branch['name']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
         </div>
-    <?php endif; ?>
+
+        <div class="col-lg-2">
+            <input type="date" class="form-control form-control-sm" name="date_from"
+                   value="<?= e($dateFrom) ?>"
+                   placeholder="From date&hellip;">
+        </div>
+
+        <div class="col-lg-2">
+            <input type="date" class="form-control form-control-sm" name="date_to"
+                   value="<?= e($dateTo) ?>"
+                   placeholder="To date&hellip;">
+        </div>
+
+        <div class="col-lg-auto">
+            <button type="submit" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-search"></i>
+                Filter
+            </button>
+            <a href="<?= e(url('/bc/visit')) ?>" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-times"></i>
+            </a>
+        </div>
+    </form>
 </div>
+
+<?php if ($visits->count() === 0): ?>
+    <div class="alert alert-info" role="alert">
+        <i class="fas fa-info-circle"></i>
+        No BC Supervisor visits found.
+        <a href="<?= e(url('/bc/visit/create')) ?>">Create one now</a>
+    </div>
+<?php else: ?>
+    <div class="table-responsive">
+        <table class="table table-hover table-striped mb-0">
+            <thead>
+                <tr>
+                    <th><a href="<?= e($sortUrl('visit_date')) ?>" class="text-decoration-none">Visit Date<?= $sortIcon('visit_date') ?></a></th>
+                    <th><a href="<?= e($sortUrl('bca_name')) ?>" class="text-decoration-none">BC Agent<?= $sortIcon('bca_name') ?></a></th>
+                    <th><a href="<?= e($sortUrl('branch_name')) ?>" class="text-decoration-none">Branch<?= $sortIcon('branch_name') ?></a></th>
+                    <th>BC Code</th>
+                    <th style="width:120px">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($visits as $visit): ?>
+                    <tr>
+                        <td>
+                            <span class="badge bg-light text-dark">
+                                <?= e(date('d M Y', (int) strtotime((string) $visit['visit_date']))) ?>
+                            </span>
+                        </td>
+                        <td>
+                            <strong><?= e((string) ($visit['bca_name'] ?? '')) ?></strong>
+                            <?php if ($visit['agent_name']): ?>
+                                <br><small class="text-muted"><?= e((string) $visit['agent_name']) ?></small>
+                            <?php endif; ?>
+                        </td>
+                        <td><?= e((string) ($visit['branch_name'] ?? '—')) ?></td>
+                        <td><?= e((string) ($visit['bc_code'] ?? '—')) ?></td>
+                        <td>
+                            <a href="<?= e(url('/bc/visit/' . (int) $visit['id'])) ?>" class="btn btn-sm btn-outline-primary" title="View">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <a href="<?= e(url('/bc/visit/' . (int) $visit['id'] . '/edit')) ?>" class="btn btn-sm btn-outline-secondary" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <form method="post" action="<?= e(url('/bc/visit/' . (int) $visit['id'] . '/delete')) ?>" style="display:inline"
+                                  onsubmit="return confirm('Are you sure?')">
+                                <?= csrf_field() ?>
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+
+    <?= $visits->render() ?>
+<?php endif; ?>
