@@ -1,0 +1,1497 @@
+/* ==========================================================================
+   D2 Recovery Solutions & Services design system
+   Professional banking: white / navy / gold. Data-dense, not decorative.
+   Layered on top of Bootstrap 5.3 (CDN) - we override tokens, not components.
+   ========================================================================== */
+
+:root {
+    /* Brand: the navy and gold of the D2 mark, so the panel, the app and the
+       launcher icon are recognisably one product. This used to be a brighter
+       blue that matched nothing. */
+    --lrms-primary: #0b2a5b;
+    --lrms-primary-dark: #071d40;
+    --lrms-primary-light: #e7edf8;
+
+    /* Gold accent. Always dark text on it - white on gold is about 2:1. */
+    --lrms-accent: #f2b21c;
+    --lrms-accent-dark: #7a5600;
+    --lrms-accent-light: #fff4d6;
+
+    /* Text */
+    --lrms-ink: #1c2128;
+    --lrms-slate: #4b5563;
+    --lrms-muted: #6b7280;
+
+    /* Surfaces */
+    --lrms-surface: #ffffff;
+    --lrms-surface-2: #fbfcfe;
+    --lrms-bg: #f5f7fa;
+    --lrms-border: #e2e5ea;
+    --lrms-border-strong: #cfd4dc;
+
+    /* Status */
+    --lrms-success: #1a7f4e;
+    --lrms-success-light: #e6f4ec;
+    --lrms-warning: #b7791f;
+    --lrms-warning-light: #fdf4e3;
+    --lrms-danger: #b3261e;
+    --lrms-danger-light: #fdecea;
+    --lrms-info: #1957c2;
+    --lrms-info-light: #e8f0fd;
+
+    /* Shape */
+    --lrms-radius: 10px;
+    --lrms-radius-sm: 7px;
+    --lrms-radius-lg: 14px;
+    --lrms-shadow: 0 1px 3px rgba(28, 33, 40, .06), 0 1px 2px rgba(28, 33, 40, .04);
+    --lrms-shadow-md: 0 4px 12px rgba(28, 33, 40, .08);
+    --lrms-shadow-lg: 0 12px 32px rgba(28, 33, 40, .14);
+
+    /* Layout */
+    --lrms-sidebar-w: 250px;
+    --lrms-topbar-h: 60px;
+
+    /* Bootstrap token overrides */
+    --bs-primary: #0b2a5b;
+    --bs-primary-rgb: 11, 42, 91;
+    --bs-body-color: #1c2128;
+    --bs-body-bg: #f5f7fa;
+    --bs-border-color: #e2e5ea;
+    --bs-border-radius: 10px;
+    --bs-link-color: #0b2a5b;
+    --bs-link-hover-color: #071d40;
+    --bs-font-sans-serif: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+        'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+}
+
+/* --------------------------------------------------------------------------
+   Dark mode. Driven by [data-theme="dark"] on <html>, set before first paint
+   by the inline script in the layout so there is no flash of light theme.
+   -------------------------------------------------------------------------- */
+[data-theme="dark"] {
+    /* Navy is invisible on a near-black background, so dark mode uses a light
+       tone of the same hue. */
+    --lrms-primary: #8ab0ee;
+    --lrms-primary-dark: #b3ccf5;
+    --lrms-primary-light: #16233c;
+
+    --lrms-accent: #f2b21c;
+    --lrms-accent-dark: #e8c25b;
+    --lrms-accent-light: #2b2113;
+
+    --lrms-ink: #e6edf3;
+    --lrms-slate: #a6b1c0;
+    --lrms-muted: #8b95a3;
+
+    --lrms-surface: #161b22;
+    --lrms-surface-2: #1b212a;
+    --lrms-bg: #0f1319;
+    --lrms-border: #262d38;
+    --lrms-border-strong: #333c49;
+
+    --lrms-success: #3fb27f;
+    --lrms-success-light: #12291f;
+    --lrms-warning: #d9a13b;
+    --lrms-warning-light: #2b2113;
+    --lrms-danger: #e5645b;
+    --lrms-danger-light: #2c1715;
+    --lrms-info: #4d8bf0;
+    --lrms-info-light: #17253c;
+
+    --lrms-shadow: 0 1px 3px rgba(0, 0, 0, .5);
+    --lrms-shadow-md: 0 4px 12px rgba(0, 0, 0, .5);
+    --lrms-shadow-lg: 0 12px 32px rgba(0, 0, 0, .6);
+
+    --bs-body-color: #e6edf3;
+    --bs-body-bg: #0f1319;
+    --bs-border-color: #262d38;
+    --bs-primary: #8ab0ee;
+    --bs-primary-rgb: 138, 176, 238;
+    --bs-link-color: #b3ccf5;
+    --bs-link-hover-color: #a3c3f8;
+    --bs-emphasis-color: #e6edf3;
+    --bs-secondary-color: #a6b1c0;
+    --bs-tertiary-bg: #1b212a;
+    color-scheme: dark;
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+* { -webkit-tap-highlight-color: transparent; }
+
+html, body { height: 100%; }
+
+body {
+    font-family: var(--bs-font-sans-serif);
+    background: var(--lrms-bg);
+    color: var(--lrms-ink);
+    font-size: .9375rem;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+}
+
+a { text-decoration: none; }
+a:hover { text-decoration: none; }
+
+h1, h2, h3, h4, h5, h6 { color: var(--lrms-ink); font-weight: 650; letter-spacing: -.01em; }
+
+.text-slate { color: var(--lrms-slate) !important; }
+.text-muted { color: var(--lrms-muted) !important; }
+
+code, kbd, pre, .font-mono {
+    font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: .875em;
+}
+
+/* Numeric columns line up when digits are tabular. */
+.num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+
+::selection { background: var(--lrms-primary); color: #fff; }
+
+/* Focus ring: visible for keyboards, not for mouse clicks. */
+:focus-visible {
+    outline: 2px solid var(--lrms-primary);
+    outline-offset: 2px;
+}
+.btn:focus, .form-control:focus, .form-select:focus {
+    box-shadow: 0 0 0 3px rgba(11, 42, 91, .18);
+    border-color: var(--lrms-primary);
+}
+
+/* ==========================================================================
+   App shell
+   ========================================================================== */
+
+.lrms-shell { display: flex; min-height: 100vh; }
+
+.lrms-sidebar {
+    width: var(--lrms-sidebar-w);
+    flex: 0 0 var(--lrms-sidebar-w);
+    background: var(--lrms-surface);
+    border-right: 1px solid var(--lrms-border);
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 1045;
+    transition: transform .22s ease;
+    overflow: hidden;
+}
+
+.lrms-brand {
+    height: var(--lrms-topbar-h);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 18px;
+    border-bottom: 1px solid var(--lrms-border);
+    flex: 0 0 auto;
+}
+
+/* The D2 monogram, cropped out of the master artwork by
+   tools/prepare-brand-assets.py. 44x32 matches the crop's 1.36:1 ratio, so
+   object-fit: cover trims almost nothing. This used to be the letters "LR" in a
+   gradient tile - an initial left over from the old product name. */
+.lrms-brand-mark {
+    width: 44px; height: 32px;
+    border-radius: 8px;
+    object-fit: cover;
+    flex: 0 0 auto;
+}
+
+.lrms-brand-text { line-height: 1.15; min-width: 0; }
+.lrms-brand-text strong { font-size: .9375rem; letter-spacing: -.02em; display: block; }
+.lrms-brand-text span {
+    font-size: .6875rem; color: var(--lrms-muted); text-transform: uppercase;
+    letter-spacing: .06em; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.lrms-nav { flex: 1 1 auto; overflow-y: auto; padding: 12px 10px 20px; }
+
+.lrms-nav-label {
+    font-size: .6875rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .07em; color: var(--lrms-muted);
+    padding: 14px 10px 6px;
+}
+
+.lrms-nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px;
+    border-radius: var(--lrms-radius-sm);
+    color: var(--lrms-slate);
+    font-weight: 500; font-size: .875rem;
+    margin-bottom: 1px;
+    transition: background .12s, color .12s;
+}
+.lrms-nav-item:hover { background: var(--lrms-bg); color: var(--lrms-ink); }
+.lrms-nav-item.active {
+    background: var(--lrms-primary-light);
+    color: var(--lrms-primary-dark);
+    font-weight: 620;
+}
+[data-theme="dark"] .lrms-nav-item.active { color: var(--lrms-primary-dark); }
+.lrms-nav-item svg { flex: 0 0 auto; width: 17px; height: 17px; opacity: .85; }
+.lrms-nav-item.active svg { opacity: 1; }
+.lrms-nav-item .badge { margin-left: auto; }
+
+.lrms-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-left: var(--lrms-sidebar-w);
+    display: flex;
+    flex-direction: column;
+}
+
+.lrms-topbar {
+    height: var(--lrms-topbar-h);
+    background: var(--lrms-surface);
+    border-bottom: 1px solid var(--lrms-border);
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 18px;
+    position: sticky; top: 0; z-index: 1030;
+}
+
+.lrms-content { padding: 20px; flex: 1 1 auto; }
+@media (min-width: 1400px) { .lrms-content { padding: 24px 28px; } }
+
+.lrms-page-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 14px; flex-wrap: wrap; margin-bottom: 18px;
+}
+.lrms-page-head h1 { font-size: 1.3rem; margin: 0 0 2px; }
+.lrms-page-head p { margin: 0; color: var(--lrms-slate); font-size: .875rem; }
+
+.lrms-sidebar-backdrop {
+    position: fixed; inset: 0; background: rgba(28, 33, 40, .5);
+    z-index: 1040; display: none;
+}
+
+@media (max-width: 991.98px) {
+    .lrms-sidebar { transform: translateX(-100%); box-shadow: var(--lrms-shadow-lg); }
+    .lrms-sidebar.open { transform: translateX(0); }
+    .lrms-sidebar-backdrop.show { display: block; }
+    .lrms-main { margin-left: 0; }
+    .lrms-content { padding: 16px 14px; }
+}
+
+/* ==========================================================================
+   Cards
+   ========================================================================== */
+
+.lrms-card {
+    background: var(--lrms-surface);
+    border: 1px solid var(--lrms-border);
+    border-radius: var(--lrms-radius);
+    box-shadow: var(--lrms-shadow);
+}
+
+.lrms-card-head {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--lrms-border);
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap;
+}
+.lrms-card-head h2, .lrms-card-head h3 {
+    font-size: .9375rem; margin: 0; font-weight: 650;
+}
+.lrms-card-head p { margin: 2px 0 0; font-size: .8125rem; color: var(--lrms-muted); }
+.lrms-card-body { padding: 16px; }
+.lrms-card-foot {
+    padding: 12px 16px; border-top: 1px solid var(--lrms-border);
+    background: var(--lrms-surface-2);
+    border-radius: 0 0 var(--lrms-radius) var(--lrms-radius);
+}
+
+/* --------------------------------------------------------------------------
+   Stat tiles
+   -------------------------------------------------------------------------- */
+
+.lrms-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.lrms-stat {
+    background: var(--lrms-surface);
+    border: 1px solid var(--lrms-border);
+    border-radius: var(--lrms-radius);
+    padding: 14px 16px;
+    box-shadow: var(--lrms-shadow);
+    display: block;
+    color: inherit;
+    position: relative;
+    overflow: hidden;
+}
+a.lrms-stat:hover { border-color: var(--lrms-border-strong); box-shadow: var(--lrms-shadow-md); }
+
+.lrms-stat-label {
+    font-size: .75rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .05em; color: var(--lrms-muted);
+    display: flex; align-items: center; gap: 6px;
+}
+.lrms-stat-value {
+    font-size: 1.6rem; font-weight: 700; letter-spacing: -.02em;
+    margin-top: 4px; color: var(--lrms-ink);
+    font-variant-numeric: tabular-nums; line-height: 1.15;
+}
+.lrms-stat-value.sm { font-size: 1.25rem; }
+.lrms-stat-sub { font-size: .75rem; color: var(--lrms-muted); margin-top: 2px; }
+
+.lrms-stat-accent { border-left: 3px solid var(--lrms-primary); }
+.lrms-stat-accent.is-warning { border-left-color: var(--lrms-warning); }
+.lrms-stat-accent.is-danger  { border-left-color: var(--lrms-danger); }
+.lrms-stat-accent.is-success { border-left-color: var(--lrms-success); }
+.lrms-stat-accent.is-slate   { border-left-color: var(--lrms-slate); }
+
+/* ==========================================================================
+   Tables
+   ========================================================================== */
+
+.lrms-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.lrms-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: .8438rem;
+    margin: 0;
+}
+
+.lrms-table thead th {
+    background: var(--lrms-surface-2);
+    color: var(--lrms-slate);
+    font-weight: 650;
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--lrms-border);
+    white-space: nowrap;
+    position: sticky; top: 0; z-index: 2;
+}
+
+.lrms-table tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--lrms-border);
+    vertical-align: middle;
+    color: var(--lrms-ink);
+}
+
+.lrms-table tbody tr:last-child td { border-bottom: 0; }
+.lrms-table tbody tr:hover { background: var(--lrms-primary-light); }
+[data-theme="dark"] .lrms-table tbody tr:hover { background: var(--lrms-surface-2); }
+
+.lrms-table tfoot td {
+    padding: 10px 12px;
+    background: var(--lrms-primary-light);
+    font-weight: 650;
+    border-top: 1px solid var(--lrms-border);
+}
+
+.lrms-table .col-check { width: 34px; padding-right: 0; }
+.lrms-table td.nowrap, .lrms-table th.nowrap { white-space: nowrap; }
+
+.lrms-sort { color: inherit; display: inline-flex; align-items: center; gap: 3px; }
+.lrms-sort:hover { color: var(--lrms-primary); }
+.lrms-sort-icon { font-size: .625rem; opacity: .8; }
+
+/* Empty state */
+.lrms-empty { padding: 44px 20px; text-align: center; color: var(--lrms-muted); }
+.lrms-empty svg { width: 42px; height: 42px; opacity: .35; margin-bottom: 12px; }
+.lrms-empty h3 { font-size: .9375rem; color: var(--lrms-slate); margin: 0 0 4px; }
+.lrms-empty p { font-size: .8438rem; margin: 0 auto; max-width: 400px; }
+
+/* ==========================================================================
+   Badges
+   ========================================================================== */
+
+.lrms-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: .6875rem;
+    font-weight: 650;
+    letter-spacing: .02em;
+    white-space: nowrap;
+    border: 1px solid transparent;
+    line-height: 1.5;
+}
+
+.badge-pending  { background: var(--lrms-warning-light); color: var(--lrms-warning); border-color: rgba(183,121,31,.22); }
+.badge-visited  { background: var(--lrms-success-light); color: var(--lrms-success); border-color: rgba(26,127,78,.22); }
+.badge-promise  { background: var(--lrms-info-light);    color: var(--lrms-primary-dark); border-color: rgba(11,42,91,.22); }
+.badge-followup { background: #eef2f6; color: var(--lrms-slate); border-color: var(--lrms-border); }
+.badge-legal    { background: var(--lrms-danger-light);  color: var(--lrms-danger); border-color: rgba(179,38,30,.22); }
+.badge-closed   { background: #eef0f3; color: var(--lrms-muted); border-color: var(--lrms-border); }
+[data-theme="dark"] .badge-followup,
+[data-theme="dark"] .badge-closed { background: var(--lrms-surface-2); }
+
+.lrms-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 11px;
+    border: 1px solid var(--lrms-border);
+    border-radius: 999px;
+    background: var(--lrms-surface);
+    color: var(--lrms-slate);
+    font-size: .8125rem; font-weight: 550;
+}
+.lrms-chip:hover { border-color: var(--lrms-primary); color: var(--lrms-primary); }
+.lrms-chip.active {
+    background: var(--lrms-primary); border-color: var(--lrms-primary); color: #fff;
+}
+.lrms-chip .count {
+    font-variant-numeric: tabular-nums; font-size: .75rem;
+    background: rgba(0,0,0,.06); padding: 0 6px; border-radius: 999px;
+}
+.lrms-chip.active .count { background: rgba(255,255,255,.22); }
+
+/* NPA marker */
+.lrms-npa {
+    display: inline-block; font-size: .625rem; font-weight: 700;
+    color: var(--lrms-danger); background: var(--lrms-danger-light);
+    border: 1px solid rgba(179,38,30,.25);
+    padding: 0 5px; border-radius: 4px; letter-spacing: .04em;
+}
+
+/* ==========================================================================
+   Forms
+   ========================================================================== */
+
+.form-label {
+    font-size: .8125rem; font-weight: 600; color: var(--lrms-slate);
+    margin-bottom: 5px;
+}
+.form-label .req { color: var(--lrms-danger); }
+
+/* background-COLOR, never the `background` shorthand.
+   ---------------------------------------------------------------------------
+   A `<select>` is painted by Bootstrap with its caret as a background IMAGE, plus a
+   background-repeat, -position and -size to place it once at the right-hand edge. The
+   shorthand resets all three of those to their initial values - `repeat`, `0% 0%`,
+   `auto` - and drops the image entirely.
+   So `background: <colour>` here did two different damages at once: in light mode the
+   dropdown arrow vanished, and in dark mode, where the rule below puts a recoloured
+   caret back, the arrow tiled across the whole control - seven chevrons in a row, the
+   first one sitting on top of the selected text.
+   Nothing on the page looked broken enough to notice in a desktop screenshot; it was a
+   phone screenshot of the borrower edit form that showed it. Keep these as
+   background-color, and if a caret is ever restated, restate its placement with it. */
+.form-control, .form-select {
+    background-color: var(--lrms-surface);
+    border: 1px solid var(--lrms-border-strong);
+    border-radius: var(--lrms-radius-sm);
+    color: var(--lrms-ink);
+    font-size: .875rem;
+    padding: .5rem .7rem;
+}
+.form-control:disabled, .form-control[readonly] { background-color: var(--lrms-bg); }
+.form-control::placeholder { color: var(--lrms-muted); opacity: .75; }
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select { background-color: var(--lrms-surface-2); }
+[data-theme="dark"] .form-select {
+    /* Bootstrap's inline SVG caret is dark; recolour it for dark mode. The three
+       placement properties are restated deliberately - see the note above. Without them
+       the caret repeats across the field. */
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23a6b1c0' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right .7rem center;
+    background-size: 15px 11px;
+}
+/* And the same placement for light mode, because the padding above differs from
+   Bootstrap's and the caret should sit at our edge inset, not theirs. */
+.form-select {
+    background-repeat: no-repeat;
+    background-position: right .7rem center;
+    background-size: 15px 11px;
+    padding-right: 2rem;
+}
+
+.form-text { font-size: .75rem; color: var(--lrms-muted); }
+.invalid-feedback { font-size: .75rem; }
+.form-control.is-invalid, .form-select.is-invalid { border-color: var(--lrms-danger); }
+
+.form-check-input:checked { background-color: var(--lrms-primary); border-color: var(--lrms-primary); }
+.form-check-label { font-size: .875rem; color: var(--lrms-ink); }
+
+/* Filter bar */
+.lrms-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+    align-items: end;
+}
+.lrms-filters .filter-actions { display: flex; gap: 8px; }
+
+/* Checkbox-grid used by the visit report form and the permission matrix */
+.lrms-check-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 8px 16px;
+}
+.lrms-check-tile {
+    display: flex; align-items: center; gap: 9px;
+    border: 1px solid var(--lrms-border);
+    border-radius: var(--lrms-radius-sm);
+    padding: 9px 11px;
+    cursor: pointer;
+    background: var(--lrms-surface);
+    transition: border-color .12s, background .12s;
+    margin: 0;
+}
+.lrms-check-tile:hover { border-color: var(--lrms-primary); }
+.lrms-check-tile input { margin: 0; flex: 0 0 auto; }
+.lrms-check-tile span { font-size: .8438rem; color: var(--lrms-ink); }
+.lrms-check-tile:has(input:checked) {
+    background: var(--lrms-primary-light);
+    border-color: var(--lrms-primary);
+}
+
+/* Fieldset styling for the long visit report form */
+.lrms-fieldset { border: 0; padding: 0; margin: 0 0 22px; }
+.lrms-fieldset > legend {
+    font-size: .8125rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .05em; color: var(--lrms-primary-dark);
+    padding: 0 0 8px; margin: 0 0 12px; border-bottom: 1px solid var(--lrms-border);
+    width: 100%; float: none;
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+
+.btn {
+    border-radius: var(--lrms-radius-sm);
+    font-size: .875rem;
+    font-weight: 600;
+    padding: .5rem .95rem;
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+}
+.btn svg { width: 15px; height: 15px; }
+.btn-sm { padding: .3rem .6rem; font-size: .8125rem; }
+.btn-sm svg { width: 13px; height: 13px; }
+
+.btn-primary {
+    background: var(--lrms-primary); border-color: var(--lrms-primary); color: #fff;
+}
+.btn-primary:hover, .btn-primary:focus {
+    background: var(--lrms-primary-dark); border-color: var(--lrms-primary-dark); color: #fff;
+}
+
+.btn-outline-secondary {
+    border-color: var(--lrms-border-strong); color: var(--lrms-slate); background: var(--lrms-surface);
+}
+.btn-outline-secondary:hover {
+    background: var(--lrms-bg); border-color: var(--lrms-border-strong); color: var(--lrms-ink);
+}
+
+.btn-ghost {
+    background: transparent; border: 1px solid transparent; color: var(--lrms-slate);
+}
+.btn-ghost:hover { background: var(--lrms-bg); color: var(--lrms-ink); }
+
+.btn-icon { padding: .4rem; width: 34px; height: 34px; }
+.btn-icon svg { width: 17px; height: 17px; }
+
+.btn-danger { background: var(--lrms-danger); border-color: var(--lrms-danger); }
+.btn-success { background: var(--lrms-success); border-color: var(--lrms-success); }
+
+/* ==========================================================================
+   Alerts
+   ========================================================================== */
+
+.alert {
+    border-radius: var(--lrms-radius);
+    border-width: 1px;
+    font-size: .875rem;
+    padding: .75rem 1rem;
+    display: flex; gap: 10px; align-items: flex-start;
+}
+.alert svg { flex: 0 0 auto; width: 17px; height: 17px; margin-top: 1px; }
+.alert-success { background: var(--lrms-success-light); border-color: rgba(26,127,78,.25); color: var(--lrms-success); }
+.alert-danger  { background: var(--lrms-danger-light);  border-color: rgba(179,38,30,.25); color: var(--lrms-danger); }
+.alert-warning { background: var(--lrms-warning-light); border-color: rgba(183,121,31,.25); color: var(--lrms-warning); }
+.alert-info    { background: var(--lrms-info-light);    border-color: rgba(11,42,91,.25); color: var(--lrms-primary-dark); }
+
+/* ==========================================================================
+   Login / auth screens
+   ========================================================================== */
+
+.lrms-auth {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1.05fr .95fr;
+    background: var(--lrms-bg);
+}
+
+.lrms-auth-brand {
+    background: linear-gradient(150deg, var(--lrms-primary-dark) 0%, var(--lrms-primary) 55%, #2f6fd8 100%);
+    color: #fff;
+    padding: 48px 52px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    position: relative; overflow: hidden;
+}
+.lrms-auth-brand::after {
+    /* Subtle grid texture: banking-formal, not decorative. */
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+        linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+    background-size: 34px 34px;
+    mask-image: radial-gradient(ellipse at 70% 30%, #000 20%, transparent 75%);
+    pointer-events: none;
+}
+.lrms-auth-brand > * { position: relative; z-index: 1; }
+.lrms-auth-brand h1 { color: #fff; font-size: 1.9rem; letter-spacing: -.025em; margin: 0 0 12px; }
+.lrms-auth-brand p { color: rgba(255,255,255,.86); font-size: .9375rem; max-width: 420px; margin: 0; }
+/* The sign-in page carries no logo - see the note in views/layouts/auth.php.
+   The name is set as a wordmark instead: wide letterspacing, a lighter tail on the
+   second word, and a short gold rule beneath. Type and one rule, nothing to load. */
+.lrms-auth-wordmark {
+    font-size: 1.375rem;
+    font-weight: 700;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: #fff;
+    line-height: 1;
+}
+.lrms-auth-wordmark::after {
+    content: "";
+    display: block;
+    width: 46px; height: 2px;
+    margin-top: 14px;
+    background: var(--lrms-accent);
+    border-radius: 2px;
+}
+.lrms-auth-points { list-style: none; padding: 0; margin: 26px 0 0; }
+.lrms-auth-points li {
+    display: flex; align-items: center; gap: 9px;
+    color: rgba(255,255,255,.9); font-size: .875rem; padding: 5px 0;
+}
+.lrms-auth-points svg { width: 16px; height: 16px; flex: 0 0 auto; }
+.lrms-auth-foot { font-size: .75rem; color: rgba(255,255,255,.6); }
+
+.lrms-auth-form {
+    display: grid; place-items: center;
+    padding: 40px 24px;
+    background: var(--lrms-surface);
+}
+.lrms-auth-box { width: 100%; max-width: 380px; }
+.lrms-auth-box h2 { font-size: 1.3rem; margin: 0 0 4px; }
+.lrms-auth-box .sub { color: var(--lrms-slate); font-size: .875rem; margin: 0 0 24px; }
+
+@media (max-width: 900px) {
+    .lrms-auth { grid-template-columns: 1fr; }
+    .lrms-auth-brand { display: none; }
+    .lrms-auth-form { align-items: start; padding-top: 8vh; background: var(--lrms-bg); }
+    .lrms-auth-box {
+        background: var(--lrms-surface); padding: 26px 22px;
+        border: 1px solid var(--lrms-border); border-radius: var(--lrms-radius-lg);
+        box-shadow: var(--lrms-shadow);
+    }
+}
+
+.lrms-auth-mobile-wordmark { display: none; }
+@media (max-width: 900px) {
+    .lrms-auth-mobile-wordmark {
+        display: block;
+        margin: 0 0 24px;
+        font-size: 1.0625rem;
+        font-weight: 700;
+        letter-spacing: .16em;
+        text-transform: uppercase;
+        color: var(--lrms-primary);
+        line-height: 1;
+    }
+    .lrms-auth-mobile-wordmark::after {
+        content: "";
+        display: block;
+        width: 38px; height: 2px;
+        margin-top: 11px;
+        background: var(--lrms-accent);
+        border-radius: 2px;
+    }
+}
+
+/* ==========================================================================
+   Timeline (append-only lead history)
+   ========================================================================== */
+
+.lrms-timeline { position: relative; padding-left: 30px; margin: 0; list-style: none; }
+.lrms-timeline::before {
+    content: ''; position: absolute; left: 9px; top: 6px; bottom: 6px;
+    width: 2px; background: var(--lrms-border);
+}
+.lrms-tl-item { position: relative; padding-bottom: 20px; }
+.lrms-tl-item:last-child { padding-bottom: 0; }
+.lrms-tl-dot {
+    position: absolute; left: -30px; top: 2px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--lrms-surface);
+    border: 2px solid var(--lrms-border-strong);
+    display: grid; place-items: center;
+}
+.lrms-tl-dot svg { width: 10px; height: 10px; }
+.lrms-tl-dot.tone-blue    { border-color: var(--lrms-primary); color: var(--lrms-primary); }
+.lrms-tl-dot.tone-success { border-color: var(--lrms-success); color: var(--lrms-success); }
+.lrms-tl-dot.tone-warning { border-color: var(--lrms-warning); color: var(--lrms-warning); }
+.lrms-tl-dot.tone-danger  { border-color: var(--lrms-danger);  color: var(--lrms-danger); }
+.lrms-tl-dot.tone-slate   { border-color: var(--lrms-border-strong); color: var(--lrms-slate); }
+
+.lrms-tl-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.lrms-tl-title { font-weight: 650; font-size: .875rem; }
+.lrms-tl-time { font-size: .75rem; color: var(--lrms-muted); font-variant-numeric: tabular-nums; }
+.lrms-tl-body { font-size: .8438rem; color: var(--lrms-slate); margin-top: 3px; }
+.lrms-tl-meta { font-size: .75rem; color: var(--lrms-muted); margin-top: 4px; display: flex; gap: 12px; flex-wrap: wrap; }
+
+/* ==========================================================================
+   Media gallery
+   ========================================================================== */
+
+.lrms-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+.lrms-thumb {
+    display: block; border: 1px solid var(--lrms-border);
+    border-radius: var(--lrms-radius-sm); overflow: hidden;
+    background: var(--lrms-bg); position: relative; aspect-ratio: 4/3;
+}
+.lrms-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lrms-thumb:hover { border-color: var(--lrms-primary); }
+.lrms-thumb-label {
+    position: absolute; inset: auto 0 0 0;
+    background: linear-gradient(transparent, rgba(0,0,0,.72));
+    color: #fff; font-size: .6875rem; font-weight: 600;
+    padding: 12px 7px 5px; text-transform: capitalize;
+}
+
+/* A photograph with its evidence attached: what it is, where it was taken, how
+   precisely, and whether it came from the camera or the gallery. The old grid of
+   bare thumbnails showed none of that, so the screen was strictly weaker than the
+   printed report it was used to approve. */
+.lrms-photo {
+    margin: 0 0 14px; border: 1px solid var(--lrms-border);
+    border-radius: var(--lrms-radius-sm); overflow: hidden; background: #fff;
+}
+.lrms-photo:last-child { margin-bottom: 0; }
+.lrms-photo-frame { display: block; background: var(--lrms-bg); aspect-ratio: 4/3; }
+.lrms-photo-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lrms-photo-frame:hover { opacity: .92; }
+.lrms-photo figcaption { padding: 7px 9px 8px; border-top: 1px solid var(--lrms-border); }
+.lrms-photo-geo {
+    display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+    font-size: .75rem; font-variant-numeric: tabular-nums;
+}
+.lrms-photo-geo svg { width: 12px; height: 12px; color: var(--lrms-muted); }
+.lrms-photo-geo a { color: var(--lrms-primary); text-decoration: none; }
+.lrms-photo-geo a:hover { text-decoration: underline; }
+/* A 2 km fix reads exactly like an 8 m one unless it is marked. */
+.lrms-geo-coarse { color: #8a5a00; font-weight: 650; cursor: help; }
+
+/* ==========================================================================
+   Definition lists (customer profile, visit report detail)
+   ========================================================================== */
+
+.lrms-dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px 20px; margin: 0; }
+.lrms-dl > div { min-width: 0; }
+.lrms-dl dt {
+    font-size: .6875rem; font-weight: 650; text-transform: uppercase;
+    letter-spacing: .05em; color: var(--lrms-muted); margin-bottom: 2px;
+}
+.lrms-dl dd { margin: 0; font-size: .875rem; color: var(--lrms-ink); font-weight: 500; word-break: break-word; }
+.lrms-dl dd.lg { font-size: 1.0625rem; font-weight: 680; font-variant-numeric: tabular-nums; }
+
+/* ==========================================================================
+   Charts (dependency-free CSS bars)
+   ========================================================================== */
+
+.lrms-bars { display: flex; align-items: flex-end; gap: 5px; height: 130px; padding-top: 8px; }
+.lrms-bar-col { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0; }
+.lrms-bar {
+    width: 100%; max-width: 30px;
+    background: linear-gradient(180deg, var(--lrms-primary), var(--lrms-primary-dark));
+    border-radius: 4px 4px 0 0;
+    min-height: 2px;
+    position: relative;
+    transition: opacity .12s;
+}
+.lrms-bar:hover { opacity: .82; }
+.lrms-bar-label {
+    font-size: .625rem; color: var(--lrms-muted); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+
+.lrms-meter { height: 7px; background: var(--lrms-bg); border-radius: 999px; overflow: hidden; }
+.lrms-meter > span { display: block; height: 100%; background: var(--lrms-primary); border-radius: 999px; }
+.lrms-meter.is-success > span { background: var(--lrms-success); }
+.lrms-meter.is-warning > span { background: var(--lrms-warning); }
+.lrms-meter.is-danger  > span { background: var(--lrms-danger); }
+
+.lrms-split { display: flex; height: 9px; border-radius: 999px; overflow: hidden; background: var(--lrms-bg); }
+.lrms-split > span { display: block; height: 100%; }
+
+/* ==========================================================================
+   Pagination
+   ========================================================================== */
+
+.lrms-pager {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap;
+}
+.lrms-pager .info { font-size: .8125rem; color: var(--lrms-muted); font-variant-numeric: tabular-nums; }
+.pagination { margin: 0; }
+.page-link {
+    color: var(--lrms-slate); border-color: var(--lrms-border);
+    background: var(--lrms-surface); font-size: .8438rem; padding: .35rem .65rem;
+}
+.page-link:hover { background: var(--lrms-bg); color: var(--lrms-ink); border-color: var(--lrms-border); }
+.page-item.active .page-link { background: var(--lrms-primary); border-color: var(--lrms-primary); color: #fff; }
+.page-item.disabled .page-link { background: var(--lrms-surface); color: var(--lrms-muted); border-color: var(--lrms-border); }
+
+/* ==========================================================================
+   Bulk action bar
+   ========================================================================== */
+
+.lrms-bulkbar {
+    position: sticky; bottom: 0; z-index: 20;
+    background: var(--lrms-primary-dark); color: #fff;
+    border-radius: var(--lrms-radius);
+    padding: 10px 14px;
+    display: none; align-items: center; gap: 12px; flex-wrap: wrap;
+    box-shadow: var(--lrms-shadow-lg);
+    margin-top: 12px;
+}
+.lrms-bulkbar.show { display: flex; }
+.lrms-bulkbar .count { font-weight: 650; font-size: .875rem; }
+/* background-color, not the shorthand - the shorthand would drop the select's caret
+   and reset its placement. See the note on .form-select. The bar sits on navy, so the
+   caret is recoloured white here too. */
+.lrms-bulkbar .form-select, .lrms-bulkbar .form-control {
+    background-color: rgba(255,255,255,.12); border-color: rgba(255,255,255,.3);
+    color: #fff; font-size: .8125rem; padding: .3rem 1.7rem .3rem .55rem; width: auto;
+}
+.lrms-bulkbar .form-select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right .55rem center;
+    background-size: 13px 10px;
+}
+.lrms-bulkbar .form-select option { color: var(--lrms-ink); }
+.lrms-bulkbar .btn-light { background: #fff; color: var(--lrms-primary-dark); border-color: #fff; font-weight: 650; }
+
+/* ==========================================================================
+   Report grid (the 8 report cards)
+   ========================================================================== */
+
+.lrms-report-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(255px, 1fr)); gap: 12px;
+}
+.lrms-report-card {
+    background: var(--lrms-surface); border: 1px solid var(--lrms-border);
+    border-radius: var(--lrms-radius); padding: 16px;
+    box-shadow: var(--lrms-shadow); color: inherit;
+    display: flex; flex-direction: column; gap: 6px;
+    transition: border-color .12s, box-shadow .12s, transform .12s;
+}
+.lrms-report-card:hover {
+    border-color: var(--lrms-primary); box-shadow: var(--lrms-shadow-md); transform: translateY(-1px);
+}
+.lrms-report-card .icon {
+    width: 34px; height: 34px; border-radius: 8px;
+    background: var(--lrms-primary-light); color: var(--lrms-primary-dark);
+    display: grid; place-items: center; margin-bottom: 4px;
+}
+.lrms-report-card .icon svg { width: 17px; height: 17px; }
+.lrms-report-card h3 { font-size: .9375rem; margin: 0; }
+.lrms-report-card p { font-size: .8125rem; color: var(--lrms-slate); margin: 0; }
+
+/* ==========================================================================
+   Misc
+   ========================================================================== */
+
+.lrms-kbd {
+    display: inline-block; padding: 1px 5px; font-size: .6875rem;
+    border: 1px solid var(--lrms-border-strong); border-bottom-width: 2px;
+    border-radius: 4px; background: var(--lrms-surface-2); color: var(--lrms-slate);
+    font-family: ui-monospace, monospace;
+}
+
+.dropdown-menu {
+    border-color: var(--lrms-border); border-radius: var(--lrms-radius);
+    box-shadow: var(--lrms-shadow-md); font-size: .875rem;
+    background: var(--lrms-surface); padding: 6px;
+}
+.dropdown-item { border-radius: var(--lrms-radius-sm); padding: .45rem .65rem; color: var(--lrms-ink); }
+.dropdown-item:hover { background: var(--lrms-bg); color: var(--lrms-ink); }
+.dropdown-item.text-danger:hover { background: var(--lrms-danger-light); }
+.dropdown-divider { border-color: var(--lrms-border); }
+.dropdown-header {
+    font-size: .6875rem; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--lrms-muted); font-weight: 700;
+}
+
+.modal-content {
+    border-radius: var(--lrms-radius-lg); border-color: var(--lrms-border);
+    background: var(--lrms-surface);
+}
+.modal-header, .modal-footer { border-color: var(--lrms-border); }
+.modal-title { font-size: 1rem; }
+
+.table-responsive { border-radius: var(--lrms-radius); }
+
+.lrms-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--lrms-primary-light); color: var(--lrms-primary-dark);
+    display: grid; place-items: center; font-weight: 650; font-size: .75rem;
+    flex: 0 0 auto; text-transform: uppercase;
+}
+
+.lrms-scroll-y { max-height: 340px; overflow-y: auto; }
+
+/* Notification list */
+.lrms-notif { display: flex; gap: 11px; padding: 11px 14px; border-bottom: 1px solid var(--lrms-border); }
+.lrms-notif:last-child { border-bottom: 0; }
+.lrms-notif.unread { background: var(--lrms-primary-light); }
+[data-theme="dark"] .lrms-notif.unread { background: var(--lrms-surface-2); }
+.lrms-notif .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--lrms-primary); margin-top: 7px; flex: 0 0 auto; }
+.lrms-notif .body { min-width: 0; flex: 1 1 auto; }
+.lrms-notif .title { font-size: .8438rem; font-weight: 620; }
+.lrms-notif .text { font-size: .8125rem; color: var(--lrms-slate); }
+.lrms-notif .time { font-size: .6875rem; color: var(--lrms-muted); margin-top: 2px; }
+
+/* ==========================================================================
+   Print - used by the "Print" action on reports and visit reports
+   ========================================================================== */
+
+@media print {
+    .lrms-sidebar, .lrms-topbar, .lrms-bulkbar, .no-print,
+    .lrms-filters, .pagination, .btn { display: none !important; }
+    .lrms-main { margin-left: 0 !important; }
+    .lrms-content { padding: 0 !important; }
+    body { background: #fff !important; font-size: 11pt; }
+    .lrms-card { border: 1px solid #ccc !important; box-shadow: none !important; break-inside: avoid; }
+    .lrms-table { font-size: 9pt; }
+    .lrms-table thead th { background: #eef2f8 !important; color: #071d40 !important; }
+    a[href]::after { content: none !important; }
+    @page { margin: 12mm; size: A4; }
+    .print-only { display: block !important; }
+    .lrms-stats { grid-template-columns: repeat(4, 1fr) !important; }
+}
+
+.print-only { display: none; }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: .001ms !important;
+        transition-duration: .001ms !important;
+    }
+}
+
+
+/* ==========================================================================
+   Report-type sections  (KRM/OTS settlement, CKCC OD-2 renewal)
+
+   These are additional sections of a field visit report rather than separate
+   pages, so they reuse the card shell and only add what is genuinely new: an
+   accent to mark them apart from the standard recovery sections, a figure row
+   for amounts a branch acts on, and callouts for a deadline or a refusal.
+   ========================================================================== */
+
+/* A top edge in the brand colour. Cheaper to scan than a differently coloured
+   card, and it survives printing to PDF as a visible rule. */
+.lrms-card-accent { border-top: 3px solid var(--lrms-primary); }
+
+.lrms-card-head h2 + .lrms-badge { margin-left: .5rem; }
+
+/* Subheading inside a card body, for the groups within a long section. */
+.lrms-subhead {
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--lrms-muted);
+    margin: 0 0 .5rem;
+}
+
+/* A quiet line of explanation under a subheading - used where the form has to
+   state a rule, e.g. that a deposit was paid at the bank, not to the agent. */
+.lrms-note {
+    font-size: .8125rem;
+    color: var(--lrms-muted);
+    margin: -.25rem 0 .75rem;
+}
+
+.lrms-prose {
+    margin: 0;
+    color: var(--lrms-ink);
+    line-height: 1.65;
+    white-space: pre-line;
+}
+
+/* Figures a branch acts on: settlement amounts get more weight than a table
+   row would give them. Wraps to one per line on a narrow screen. */
+.lrms-figures {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: .75rem;
+}
+
+.lrms-figure {
+    background: var(--lrms-primary-light);
+    border: 1px solid rgba(11, 42, 91, .18);
+    border-radius: 10px;
+    padding: .7rem .85rem;
+}
+
+.lrms-figure-label {
+    display: block;
+    font-size: .6875rem;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--lrms-primary-dark);
+    margin-bottom: .2rem;
+}
+
+.lrms-figure-value {
+    display: block;
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: var(--lrms-ink);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Callout: a consequence, not a field. The renewal deadline uses the tone to
+   carry urgency so nobody has to work out the arithmetic while skimming. */
+.lrms-callout {
+    border: 1px solid var(--lrms-border);
+    border-left-width: 4px;
+    border-radius: 8px;
+    padding: .75rem .9rem;
+    font-size: .875rem;
+    line-height: 1.55;
+    background: var(--lrms-surface-variant);
+    color: var(--lrms-ink);
+}
+
+.lrms-callout-info {
+    background: var(--lrms-info-light);
+    border-color: rgba(11, 42, 91, .22);
+    border-left-color: var(--lrms-primary);
+}
+
+.lrms-callout-warning {
+    background: var(--lrms-warning-light);
+    border-color: rgba(183, 121, 31, .22);
+    border-left-color: var(--lrms-warning);
+}
+
+.lrms-callout-danger {
+    background: var(--lrms-danger-light);
+    border-color: rgba(179, 38, 30, .22);
+    border-left-color: var(--lrms-danger);
+}
+
+
+
+/* ==========================================================================
+   PREMIUM LAYER
+   ==========================================================================
+
+   Refinement pass over the base system above. It changes how things feel, not
+   what they are: no markup changed, no component replaced, every rule works off
+   the same tokens so dark mode follows for free.
+
+   Three principles, in this order:
+
+   1. This is a banking tool used all day. Depth and motion are there to make
+      hierarchy obvious, never to decorate. Nothing bounces, nothing pulses.
+   2. Agents and branch staff are often on poor connections and modest hardware.
+      Every effect here is composited (transform/opacity/shadow) - no animated
+      layout properties, no blur on large scrolling surfaces.
+   3. Density stays. A recovery officer scans hundreds of rows; whitespace that
+      looks generous in a screenshot costs them scrolling all day.
+   ========================================================================== */
+
+:root {
+    /* Layered, brand-tinted elevation.
+
+       Two shadows per level: a tight dark one for the contact edge and a wide
+       soft one for the ambient cast. Tinted with the brand hue rather than pure
+       black - neutral grey shadows are what make a UI look flat and cheap. */
+    --lrms-shadow:    0 1px 2px rgba(16, 32, 66, .05), 0 1px 3px rgba(16, 32, 66, .04);
+    --lrms-shadow-md: 0 2px 4px rgba(16, 32, 66, .05), 0 8px 20px -4px rgba(16, 32, 66, .10);
+    --lrms-shadow-lg: 0 4px 8px rgba(16, 32, 66, .06), 0 20px 44px -8px rgba(16, 32, 66, .16);
+
+    /* A hairline that reads as a crease rather than a drawn line. */
+    --lrms-hairline: rgba(16, 32, 66, .07);
+
+    /* One duration and one curve everywhere, so the whole panel moves as a
+       single object instead of a collection of parts with their own opinions. */
+    --lrms-ease: cubic-bezier(.2, .6, .3, 1);
+    --lrms-fast: .14s;
+    --lrms-slow: .24s;
+}
+
+[data-theme="dark"] {
+    /* Dark surfaces cannot lean on shadow for separation - a black shadow on a
+       near-black background is invisible. Depth comes from a top inset
+       highlight, the way real materials catch light. */
+    --lrms-shadow:    0 1px 2px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .03);
+    --lrms-shadow-md: 0 6px 18px -4px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .04);
+    --lrms-shadow-lg: 0 18px 44px -8px rgba(0, 0, 0, .75), inset 0 1px 0 rgba(255, 255, 255, .05);
+    --lrms-hairline: rgba(255, 255, 255, .06);
+}
+
+/* --------------------------------------------------------------------------
+   Typography
+   -------------------------------------------------------------------------- */
+
+body {
+    /* Optical sizing and slightly tightened tracking at body size: Inter is
+       designed for it and it buys noticeably crisper text. */
+    font-feature-settings: 'cv11', 'ss01';
+    letter-spacing: -.005em;
+    text-rendering: optimizeLegibility;
+}
+
+h1 { font-size: 1.5rem; letter-spacing: -.022em; }
+h2 { font-size: 1.0625rem; letter-spacing: -.018em; }
+h3 { font-size: .9375rem; letter-spacing: -.012em; }
+
+/* Every number in the product lines up in a column and never reflows as it
+   changes. Money that jitters while a page updates looks broken. */
+.lrms-stat-value,
+.lrms-figure-value,
+.lrms-table td,
+.lrms-dl dd,
+.num {
+    font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------------------
+   Sidebar
+   -------------------------------------------------------------------------- */
+
+.lrms-sidebar {
+    /* A whisper of a gradient stops a 250px flat panel reading as dead space. */
+    background:
+        linear-gradient(180deg, var(--lrms-surface) 0%, var(--lrms-surface-2) 100%);
+    border-right: 1px solid var(--lrms-hairline);
+}
+
+.lrms-brand { border-bottom: 1px solid var(--lrms-hairline); }
+
+/* The mark is now an image, so it needs lift rather than a fill. The navy behind
+   it only shows while the image is still loading. */
+.lrms-brand-mark {
+    background: var(--lrms-primary);
+    box-shadow: 0 2px 6px -1px rgba(11, 42, 91, .4);
+}
+
+.lrms-nav-label {
+    font-size: .625rem;
+    letter-spacing: .1em;
+    color: var(--lrms-muted);
+    opacity: .8;
+}
+
+.lrms-nav-item {
+    border-radius: var(--lrms-radius-sm);
+    transition: background-color var(--lrms-fast) var(--lrms-ease),
+                color var(--lrms-fast) var(--lrms-ease);
+    position: relative;
+}
+
+.lrms-nav-item:hover { background: var(--lrms-primary-light); }
+
+/* The active item gets a left marker as well as a tint. Colour alone fails for
+   the ~8% of men with a colour vision deficiency, and this navigation is the
+   only thing telling you where you are. */
+.lrms-nav-item.active {
+    background: var(--lrms-primary-light);
+    color: var(--lrms-primary-dark);
+    font-weight: 620;
+}
+.lrms-nav-item.active::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 50%;
+    width: 3px; height: 18px;
+    margin-top: -9px;
+    border-radius: 0 3px 3px 0;
+    background: var(--lrms-primary);
+}
+.lrms-nav-item.active svg { color: var(--lrms-primary); }
+
+/* --------------------------------------------------------------------------
+   Topbar
+   -------------------------------------------------------------------------- */
+
+.lrms-topbar {
+    border-bottom: 1px solid var(--lrms-hairline);
+    /* Translucent so content scrolling underneath stays perceptible. Confined
+       to a 60px strip, which keeps the blur cheap even on a low-end laptop. */
+    background: var(--lrms-surface);
+    background: color-mix(in srgb, var(--lrms-surface) 88%, transparent);
+    backdrop-filter: saturate(180%) blur(12px);
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
+}
+
+/* No color-mix support: fall back to opaque rather than to unreadable text. */
+@supports not (background: color-mix(in srgb, red 50%, transparent)) {
+    .lrms-topbar { background: var(--lrms-surface); }
+}
+
+/* --------------------------------------------------------------------------
+   Cards
+   -------------------------------------------------------------------------- */
+
+.lrms-card {
+    border-color: var(--lrms-hairline);
+    box-shadow: var(--lrms-shadow);
+    transition: box-shadow var(--lrms-slow) var(--lrms-ease),
+                border-color var(--lrms-slow) var(--lrms-ease);
+}
+
+.lrms-card-head {
+    border-bottom: 1px solid var(--lrms-hairline);
+    /* Barely-there wash: separates the head without a second border. */
+    background: var(--lrms-surface-2);
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--lrms-surface-2) 60%, transparent) 0%,
+        transparent 100%);
+}
+
+/* Lift only what is actually clickable. A card that rises under the cursor and
+   then does nothing is a promise the interface fails to keep. */
+a.lrms-card:hover {
+    box-shadow: var(--lrms-shadow-md);
+    border-color: var(--lrms-border-strong);
+    border-color: color-mix(in srgb, var(--lrms-primary) 25%, var(--lrms-border));
+}
+
+/* --------------------------------------------------------------------------
+   KPI cards
+   -------------------------------------------------------------------------- */
+
+.lrms-stat {
+    box-shadow: var(--lrms-shadow);
+    border-color: var(--lrms-hairline);
+    transition: transform var(--lrms-slow) var(--lrms-ease),
+                box-shadow var(--lrms-slow) var(--lrms-ease);
+}
+
+/* A 1px rise: enough to feel responsive, small enough that a grid of twelve
+   does not appear to wobble as the pointer crosses it. */
+a.lrms-stat:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--lrms-shadow-md);
+}
+a.lrms-stat:active { transform: translateY(0); }
+
+/* The accent bar reads as painted onto the card edge, not stuck beside it. */
+.lrms-stat-accent {
+    border-left-width: 0;
+    padding-left: 19px;
+}
+.lrms-stat-accent::after {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--lrms-primary);
+}
+.lrms-stat-accent.is-warning::after { background: var(--lrms-warning); }
+.lrms-stat-accent.is-danger::after  { background: var(--lrms-danger); }
+.lrms-stat-accent.is-success::after { background: var(--lrms-success); }
+.lrms-stat-accent.is-slate::after   { background: var(--lrms-slate); }
+
+/* --------------------------------------------------------------------------
+   Tables
+   -------------------------------------------------------------------------- */
+
+.lrms-table thead th {
+    background: var(--lrms-surface-2);
+    border-bottom: 1px solid var(--lrms-border);
+    /* The header is already sticky. This shadow only appears once rows have
+       scrolled beneath it, so a short table has no floating edge. */
+    box-shadow: 0 1px 0 var(--lrms-hairline);
+    font-size: .6875rem;
+    letter-spacing: .06em;
+}
+
+.lrms-table tbody td { border-bottom: 1px solid var(--lrms-hairline); }
+
+/* Tinted hover rather than grey. On a 40-row recovery list the cursor row has
+   to be unmistakable at a glance. */
+.lrms-table tbody tr { transition: background-color var(--lrms-fast) linear; }
+.lrms-table tbody tr:hover {
+    background: var(--lrms-surface-2);
+    background: color-mix(in srgb, var(--lrms-primary) 4%, transparent);
+}
+
+/* Breathing room at the edges, so the first column is not welded to the border. */
+.lrms-table thead th:first-child,
+.lrms-table tbody td:first-child { padding-left: 16px; }
+.lrms-table thead th:last-child,
+.lrms-table tbody td:last-child { padding-right: 16px; }
+
+/* --------------------------------------------------------------------------
+   Buttons
+   -------------------------------------------------------------------------- */
+
+.btn {
+    transition: background-color var(--lrms-fast) var(--lrms-ease),
+                border-color var(--lrms-fast) var(--lrms-ease),
+                box-shadow var(--lrms-fast) var(--lrms-ease),
+                transform var(--lrms-fast) var(--lrms-ease);
+    font-weight: 560;
+    letter-spacing: -.005em;
+}
+
+.btn-primary {
+    /* A 6% top-to-bottom gradient. Invisible as a gradient; the surface just
+       stops looking like a flat rectangle of colour. */
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(0, 0, 0, .04));
+    box-shadow: 0 1px 2px rgba(16, 32, 66, .16);
+}
+.btn-primary:hover { box-shadow: 0 2px 6px -1px rgba(11, 42, 91, .34); }
+
+/* Presses translate. Without it a click on a touchscreen has no acknowledgement
+   until the next page paints, which on a slow link feels like nothing happened. */
+.btn:active { transform: translateY(1px); }
+
+.btn:disabled, .btn.disabled { box-shadow: none; opacity: .55; }
+
+/* --------------------------------------------------------------------------
+   Forms
+   -------------------------------------------------------------------------- */
+
+.form-control, .form-select {
+    transition: border-color var(--lrms-fast) var(--lrms-ease),
+                box-shadow var(--lrms-fast) var(--lrms-ease);
+}
+
+/* Two rings: a tight opaque one for the edge and a soft halo outside it. Reads
+   as focus at a glance without the heavy glow of a single fat ring. */
+.form-control:focus, .form-select:focus, .btn:focus-visible {
+    box-shadow: 0 0 0 3px rgba(11, 42, 91, .18);
+    box-shadow: 0 0 0 1px var(--lrms-primary),
+                0 0 0 4px color-mix(in srgb, var(--lrms-primary) 16%, transparent);
+    border-color: var(--lrms-primary);
+}
+
+.form-label {
+    font-size: .8125rem;
+    font-weight: 580;
+    color: var(--lrms-slate);
+    letter-spacing: -.003em;
+}
+
+/* An invalid field is outlined in red AND labelled. Colour alone is not an
+   error message. */
+.form-control.is-invalid, .form-select.is-invalid {
+    border-color: var(--lrms-danger);
+    box-shadow: 0 0 0 3px rgba(179, 38, 30, .14);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--lrms-danger) 12%, transparent);
+}
+
+/* --------------------------------------------------------------------------
+   Badges and chips
+   -------------------------------------------------------------------------- */
+
+.lrms-badge {
+    /* An inner ring instead of a border keeps the pill's exact height, so a row
+       of badges sits on one baseline. */
+    border: 1px solid transparent;
+    box-shadow: inset 0 0 0 1px currentColor;
+    font-weight: 600;
+    letter-spacing: .005em;
+    opacity: .96;
+}
+
+/* --------------------------------------------------------------------------
+   Scrollbars
+   -------------------------------------------------------------------------- */
+
+* { scrollbar-width: thin; scrollbar-color: var(--lrms-border-strong) transparent; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background: var(--lrms-border-strong);
+    border-radius: 10px;
+    /* Inset by a transparent border so the thumb looks narrower than its
+       hit area - easy to grab, quiet to look at. */
+    border: 3px solid transparent;
+    background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--lrms-muted); background-clip: content-box; }
+
+/* --------------------------------------------------------------------------
+   Motion and print: only what this layer's own additions require
+   --------------------------------------------------------------------------
+
+   The base system already has a @media print block and a prefers-reduced-motion
+   block above. These do NOT repeat them - they cover just the effects introduced
+   here, so there is one place to look for each concern instead of two competing
+   ones. */
+
+@media (prefers-reduced-motion: reduce) {
+    /* The base block already zeroes durations. Transforms need cancelling too,
+       or a hover still physically moves the card. Movement is exactly what this
+       setting is asking us not to do: for someone with a vestibular disorder it
+       is unpleasant, not merely distracting. */
+    a.lrms-stat:hover,
+    a.lrms-stat:active,
+    .btn:active {
+        transform: none;
+    }
+}
+
+@media print {
+    /* All of these exist only because this layer added them, and each would
+       otherwise waste ink on a filed report. */
+    .lrms-card-head { background: none !important; }
+    .lrms-table thead th { box-shadow: none !important; }
+
+    /* Tinted panels lose their fill when printed, so the border has to carry the
+       meaning on its own - a printed report must still show which sections were
+       flagged urgent. */
+    .lrms-callout, .lrms-figure { background: #fff !important; }
+}
+
+
+/* ==========================================================================
+   Closed by default, even with no Bootstrap
+   ==========================================================================
+   Everything that is meant to be hidden until it is opened - dropdown menus,
+   modal dialogs, offcanvas panels - is hidden by Bootstrap's own stylesheet,
+   which arrives from a CDN. When that request fails, and on a bank's outbound
+   filter it does, every menu and every dialog on the page renders at once,
+   stacked down the screen. On the user list that meant one open dialog per
+   user, which is precisely how it was reported.
+
+   These four rules are in THIS file, which is served from the same host as the
+   panel, so a page can no longer depend on somebody else's server arriving in
+   order to stay shut. They mirror what Bootstrap does rather than fight it:
+   Bootstrap opens a dropdown by adding .show to the menu, and a modal by
+   setting an inline display:block - and an inline style wins over a class
+   selector, so nothing here can keep a dialog from opening.
+   ========================================================================== */
+.dropdown-menu:not(.show) { display: none; }
+.modal:not(.show) { display: none; }
+
+/* The settings screen is tabs, and an unstyled tab set is every group's fields at
+   once - seven panels of settings down one page. Scoped to .tab-content so it can
+   never catch anything else, and deliberately NOT extended to .collapse or
+   .navbar-collapse: neither is used here, and a blanket rule for them would be a
+   trap for whoever adds the first one. */
+.tab-content > .tab-pane:not(.active) { display: none; }
