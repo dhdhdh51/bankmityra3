@@ -1592,6 +1592,50 @@ CREATE TABLE `sss_enrollment` (
   CONSTRAINT `fk_sss_branch` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ============================================================================
+-- BC SUPERVISOR VISIT FORM
+-- ============================================================================
+-- BC Supervisor visit reports, capturing BC Agent performance and compliance during visits.
+-- Supervisors visit BC Agents to assess their performance, equipment, documentation, and remuneration.
+DROP TABLE IF EXISTS `bc_visits`;
+CREATE TABLE `bc_visits` (
+  `id`                      BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id`                 INT UNSIGNED DEFAULT NULL COMMENT 'FK to users.id (BC Agent visited)',
+  `supervisor_id`           INT UNSIGNED NOT NULL COMMENT 'FK to users.id (Supervisor who visited)',
+  `visit_date`              DATE         NOT NULL,
+  `visit_time`              TIME         DEFAULT NULL,
+
+  -- BC Agent details (auto-populated from users table, but stored for historical record)
+  `bca_name`                VARCHAR(150) DEFAULT NULL COMMENT 'BC Agent name',
+  `bc_code`                 VARCHAR(40)  DEFAULT NULL COMMENT 'BC Code',
+  `cbc_name`                VARCHAR(150) DEFAULT NULL COMMENT 'SP/CBC name',
+  `branch_name`             VARCHAR(150) DEFAULT NULL COMMENT 'Agent''s branch name',
+  `iibf_certificate_no`     VARCHAR(40)  DEFAULT NULL COMMENT 'IIBF certificate number',
+  `ssa_non_ssa`             VARCHAR(150) DEFAULT NULL COMMENT 'SSA or Non-SSA designation',
+  `board_link_br_name`      VARCHAR(150) DEFAULT NULL COMMENT 'Link branch name',
+
+  -- Supervisor observations and assessment
+  `qualification`           VARCHAR(255) DEFAULT NULL COMMENT 'Agent''s educational qualification',
+  `age`                     INT UNSIGNED DEFAULT NULL COMMENT 'Agent''s age',
+  `address_contact`         VARCHAR(500) DEFAULT NULL COMMENT 'Agent''s residential address',
+  `board_available`         TINYINT(1)   DEFAULT NULL COMMENT 'Board/materials available',
+  `equipment_status`        VARCHAR(255) DEFAULT NULL COMMENT 'Equipment status and condition',
+  `remuneration`            VARCHAR(255) DEFAULT NULL COMMENT 'Remuneration details',
+  `feedback`                VARCHAR(1000) DEFAULT NULL COMMENT 'Supervisor feedback',
+  `observation`             VARCHAR(1000) DEFAULT NULL COMMENT 'General observations',
+  `visiting_official_name`  VARCHAR(150) DEFAULT NULL COMMENT 'Name of visiting official',
+
+  `created_at`              DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`              DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  PRIMARY KEY (`id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_supervisor_id` (`supervisor_id`),
+  KEY `idx_visit_date` (`visit_date`),
+  CONSTRAINT `fk_bc_visit_user`       FOREIGN KEY (`user_id`)       REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_bc_visit_supervisor` FOREIGN KEY (`supervisor_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Scorecard weights, editable rather than compiled in, so a region can weight
 -- recovery over enrolment without a deploy.
 DROP TABLE IF EXISTS `score_weights`;
