@@ -78,6 +78,19 @@
                     </select>
                 </div>
 
+                <div>
+                    <label class="form-label" for="v-report-type">Report type</label>
+                    <select class="form-select" id="v-report-type" name="report_type" data-auto-submit>
+                        <option value="">All report types</option>
+                        <?php foreach (\App\Models\VisitReport::REPORT_TYPES as $typeKey => $typeLabel): ?>
+                            <option value="<?= e($typeKey) ?>"
+                                <?= ($filters['report_type'] ?? '') === $typeKey ? 'selected' : '' ?>>
+                                <?= e($typeLabel) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
                 <div class="filter-actions">
                     <button type="submit" class="btn btn-primary"><?= icon('filter') ?> Filter</button>
                     <a href="<?= e(url('/visits')) ?>" class="btn btn-outline-secondary">Reset</a>
@@ -100,6 +113,7 @@
                 <thead>
                     <tr>
                         <th>Visit date</th>
+                        <th>Report type</th>
                         <th>Loan account</th>
                         <th>Customer</th>
                         <th>Village</th>
@@ -118,6 +132,11 @@
                                 <div class="text-muted" style="font-size:.6875rem">
                                     <?= e(fmt_time((string) $visit['visit_time'])) ?>
                                 </div>
+                            </td>
+                            <td class="nowrap">
+                                <span class="lrms-badge badge-followup" style="font-size:.6875rem">
+                                    <?= e(enum_label(\App\Models\VisitReport::REPORT_TYPES, $visit['report_type'] ?? null)) ?>
+                                </span>
                             </td>
                             <td class="nowrap">
                                 <a href="<?= e(url('/customers/' . (int) $visit['loan_account_id'])) ?>"

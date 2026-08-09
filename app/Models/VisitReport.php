@@ -151,12 +151,15 @@ final class VisitReport
      * pre-NPA worklist, the one that exists to stop an account going bad, unbuildable.
      */
     public const REPORT_TYPES = [
-        'ots'           => 'KRM OTS',
-        'ckcc_renewal'  => 'CKCC OD-2 Renewal',
-        'recovery'      => 'Recovery Follow-up',
-        'pre_npa'       => 'Pre-NPA Verification',
-        'post_npa'      => 'Post-NPA Verification',
-        'other'         => 'Other',
+        'ots'                 => 'KRM OTS',
+        'ckcc_renewal'        => 'CKCC OD-2 Renewal',
+        'ckcc_od'             => 'CKCC OD-2 Scheme',
+        'ckcc_npa_ots'        => 'CKCC NPA OTS (Krishak Rin Mochan)',
+        'bc_supervisor_visit' => 'BC Supervisor Field Visit',
+        'recovery'            => 'Recovery Follow-up',
+        'pre_npa'             => 'Pre-NPA Verification',
+        'post_npa'            => 'Post-NPA Verification',
+        'other'               => 'Other',
     ];
 
     public const OTS_SCHEMES = [
@@ -467,6 +470,12 @@ final class VisitReport
         if ($loanType !== '') {
             $where[] = 'vr.loan_type = ?';
             $params[] = $loanType;
+        }
+
+        $reportType = trim((string) ($filters['report_type'] ?? ''));
+        if ($reportType !== '') {
+            $where[] = 'vr.report_type = ?';
+            $params[] = $reportType;
         }
 
         $search = trim((string) ($filters['search'] ?? ''));
