@@ -39,14 +39,6 @@ final class LeadController extends Controller
         $withPii = Auth::can('customers.view_pii') || Auth::isAgent();
         $items = $withPii ? LoanAccount::attachMobiles($page->items) : $page->items;
 
-        // Debug: Log response to check data
-        Logger::info('API Lead List Response', [
-            'user_id' => $user['id'],
-            'filters' => $filters,
-            'item_count' => count($items),
-            'page' => $page->meta(),
-        ]);
-
         Response::success(
             array_map(fn (array $lead): array => $this->presentLead($lead, $withPii), $items),
             '',
