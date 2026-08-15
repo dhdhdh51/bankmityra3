@@ -75,7 +75,7 @@ $roleAssigned = $assigned[(int) ($selected['id'] ?? 0)] ?? [];
                             <div class="alert alert-info mb-0">
                                 <?= icon('shield-check') ?>
                                 <div>
-                                    The <strong>Super Admin</strong> role always holds every permission, including
+                                    The <strong>Super Supervisor</strong> role always holds every permission, including
                                     any added by future modules. It is intentionally not editable &mdash; removing a
                                     permission here could lock every administrator out of the system.
                                 </div>

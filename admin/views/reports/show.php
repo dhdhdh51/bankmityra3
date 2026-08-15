@@ -129,9 +129,9 @@ $formatCell = static function (mixed $value, string $columnType): string {
                     </div>
                 <?php endif; ?>
 
-                <?php if (in_array($type, ['daily', 'weekly', 'monthly', 'agent', 'promise', 'branch'], true)): ?>
+                <?php if (in_array($type, ['daily', 'weekly', 'monthly', 'agent', 'promise', 'branch', 'ckcc-od', 'ckcc-npa-krm'], true)): ?>
                     <div>
-                        <label class="form-label" for="r-agent">Agent</label>
+                        <label class="form-label" for="r-agent">BC Supervisor</label>
                         <select class="form-select" id="r-agent" name="agent_id">
                             <option value="">All agents</option>
                             <?php foreach ($agents as $agent): ?>

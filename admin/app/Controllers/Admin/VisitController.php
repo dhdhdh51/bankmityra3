@@ -81,6 +81,10 @@ final class VisitController extends Controller
             // the whole card rather than print a heading over nothing.
             'ots'        => VisitReport::otsDetails((int) $report['id']),
             'ckcc'       => VisitReport::ckccDetails((int) $report['id']),
+            // ADD-ON sections: two dedicated field reports, entirely separate from
+            // the two above. Also null unless this specific report carried them.
+            'ckccOd'     => VisitReport::ckccOdDetails((int) $report['id']),
+            'npaOts'     => VisitReport::npaOtsDetails((int) $report['id']),
             'photos'     => VisitReport::photos((int) $report['id']),
             'documents'  => VisitReport::documents((int) $report['id']),
             'revisions'  => VisitReport::revisions((int) $report['id']),
@@ -388,7 +392,7 @@ final class VisitController extends Controller
             'Regional Office'     => $report['regional_office'],
             'Zone'                => $report['zone'],
             'SP / CBC Name'       => $report['sp_cbc_name'],
-            'BC Agent / DRA Name' => $report['agent_name'],
+            'BC Supervisor / DRA Name' => $report['agent_name'],
             'BC Code / DRA ID'    => $report['bc_code'],
             'Linked Branch'       => $report['linked_branch'],
             'District'            => $report['district'],
@@ -654,13 +658,13 @@ final class VisitController extends Controller
             $pdf->paragraph('Other document: ' . (string) $report['doc_other_text'], 8.2, '#1c2128');
         }
 
-        // ---- 8. BC agent / DRA observations ---------------------------------
+        // ---- 8. BC Supervisor / DRA observations ---------------------------------
         //
         // What the agent found out about payment sits here rather than under its own
         // numbered band. The form has thirteen sections and this system has to print
         // those thirteen if the paper copy is to match, so the recovery findings go where
         // a reader looks for what the agent learned - which is what they are.
-        $pdf->sectionBand(8, 'BC Agent / DRA Observations');
+        $pdf->sectionBand(8, 'BC Supervisor / DRA Observations');
 
         $pdf->groupLabel('Recovery Possibility');
         $pdf->checkboxGrid(self::pdfFlags(VisitReport::RECOVERY_FLAGS, $report), 4);
@@ -789,7 +793,7 @@ final class VisitController extends Controller
         // app that never showed the tick box must not be printed as though it had.
         $pdf->paragraph(
             (int) ($report['declaration_accepted'] ?? 0) === 1
-                ? 'The BC agent / DRA accepted this declaration when submitting the report.'
+                ? 'The BC Supervisor / DRA accepted this declaration when submitting the report.'
                 : 'This report was submitted without the declaration being accepted in the app.',
             8.2,
             (int) ($report['declaration_accepted'] ?? 0) === 1 ? '#0f766e' : '#8a5a00'
@@ -802,7 +806,7 @@ final class VisitController extends Controller
         $agentIdentity = (string) $report['agent_name']
             . "\n" . (string) ($report['bc_code'] ?? $agent['employee_code'] ?? '');
 
-        $pdf->groupLabel('BC Agent / DRA');
+        $pdf->groupLabel('BC Supervisor / DRA');
         $pdf->formFields([
             'Name'             => $report['agent_name'],
             'BC Code / DRA ID' => $report['bc_code'] ?? ($agent['employee_code'] ?? null),
@@ -817,7 +821,7 @@ final class VisitController extends Controller
         if ($agentPhoto !== null) {
             $pdf->imageStrip([[
                 'path'    => Uploader::absolutePath((string) $agentPhoto['file_path']),
-                'label'   => 'BC Agent (at the visit)',
+                'label'   => 'BC Supervisor (at the visit)',
                 'caption' => $agentIdentity . "\n" . Geo::photo($agentPhoto),
             ]], 96.0);
         } else {
@@ -843,7 +847,7 @@ final class VisitController extends Controller
         // nothing and invites the opposite habit - signing the paper and never recording
         // the decision, which leaves the approval nowhere a report can be listed by.
         $pdf->signatureBlock([[
-            'label'   => 'BC Agent / DRA Signature',
+            'label'   => 'BC Supervisor / DRA Signature',
             'caption' => $agentIdentity . "\nDate:",
         ]], 60.0, 16.0, 2);
 
@@ -973,6 +977,336 @@ final class VisitController extends Controller
         Response::download(
             $pdf->output(),
             sprintf('lrms_visit_%s_%d.pdf', (string) $report['loan_account_number'], (int) $report['id']),
+            Pdf::MIME
+        );
+    }
+
+    /**
+     * Printable CKCC OD Field Report.
+     *
+     * ADD-ON: entirely separate from pdf() above. Deliberately its own method
+     * rather than a branch inside pdf(), so the existing CKCC OD-2 Renewal / KRM
+     * OTS printout is never touched by this report's formatting. No Borrower
+     * Signature block, matching the rest of this report family.
+     */
+    public function pdfCkccOd(Request $request): void
+    {
+        $this->guard($request, 'visits.view');
+
+        $report = $this->load($request);
+        $id = (int) $report['id'];
+        $details = VisitReport::ckccOdDetails($id);
+
+        if ($details === null) {
+            $this->back('/visits/' . $id, 'danger', 'This report has no CKCC OD Field Report section.');
+        }
+
+        $organisation = trim((string) Settings::get('report_org_name', '')) !== ''
+            ? (string) Settings::get('report_org_name')
+            : 'D2 Recovery Solutions & Services';
+
+        $pdf = new Pdf(
+            'CKCC OD Field Report',
+            sprintf(
+                '%s · %s · %s',
+                (string) $report['loan_account_number'],
+                (string) $report['customer_name'],
+                fmt_date((string) $report['visit_date'])
+            ),
+            false,
+            'D2 Recovery Solutions & Services confidential - field verification record'
+        );
+        $pdf->useRunningHeader($organisation . '  |  CKCC OD Field Report');
+        $pdf->titleBlock($organisation, 'CKCC OD Field Report', [
+            'Dedicated CKCC OD Case Field Verification',
+            "RBI Guidelines & Bank's Code of Conduct Compliant Format",
+        ]);
+
+        $pdf->sectionBand(1, 'General Information');
+        $pdf->formFields([
+            'Visit Date'          => fmt_date((string) $report['visit_date']),
+            'Visit Time'          => fmt_time((string) $report['visit_time']),
+            'Branch Name'         => $report['branch_name'] ?: $report['branch_display_name'],
+            'BC Supervisor Name'  => $report['agent_name'],
+            'BCBF Code'           => $report['bcbf_code'] ?? $report['bc_code'],
+            'Village / Location'  => $report['village'],
+        ], 2);
+
+        $pdf->sectionBand(2, 'Borrower Information');
+        $pdf->formFields([
+            'Borrower Name'              => $report['customer_name'],
+            "Father's / Husband's Name"  => $report['father_husband_name'],
+            'Mobile Number'              => $report['mobile_masked'],
+            'Aadhaar (Last 4 Digits)'    => $report['aadhaar_masked'],
+        ], 2);
+
+        $pdf->sectionBand(3, 'CKCC OD Account Details');
+        $pdf->formFields([
+            'Loan Account Number' => $report['loan_account_number'],
+            'CIF Number'          => $details['cif_number'] ?? $report['cif_number'],
+            'Sanction Date'       => $details['sanction_date'] === null
+                ? '-' : fmt_date((string) $details['sanction_date']),
+            'Sanction Limit'      => self::pdfMoney($details['sanction_limit']),
+            'Drawing Power'       => self::pdfMoney($details['drawing_power']),
+            'Outstanding Amount'  => self::pdfMoney($details['outstanding_amount']),
+            'Interest Overdue'    => self::pdfMoney($details['interest_overdue']),
+            'OD Limit'            => self::pdfMoney($details['od_limit']),
+            'OD Utilization'      => self::pdfMoney($details['od_utilization']),
+            'Last Credit Date'    => $details['last_credit_date'] === null
+                ? '-' : fmt_date((string) $details['last_credit_date']),
+        ], 2);
+
+        $pdf->groupLabel('Eligible for Renewal');
+        $pdf->checkboxGrid(self::pdfYesNo((int) $details['eligible_for_renewal'] === 1), 3);
+
+        $pdf->groupLabel('KYC Status');
+        $pdf->checkboxGrid(self::pdfOptions(VisitReport::CKCC_OD_KYC_STATUSES, $details['kyc_status'] ?? null), 3);
+
+        $pdf->groupLabel('Renewal Readiness');
+        $pdf->checkboxGrid(self::pdfFlags(VisitReport::CKCC_OD_ELIGIBILITY_FLAGS, $details), 2);
+
+        $pdf->groupLabel('Renewal Consent');
+        $pdf->checkboxGrid(self::pdfFlags(VisitReport::CKCC_OD_CONSENT_FLAGS, $details), 2);
+
+        $pdf->sectionBand(4, 'Physical Verification');
+        $pdf->checkboxGrid(self::pdfFlags(VisitReport::CONTACT_FLAGS, $report), 3);
+        $pdf->groupLabel('Borrower Alive');
+        $pdf->checkboxGrid(self::pdfYesNo((int) $report['borrower_alive'] === 1), 3);
+
+        $pdf->sectionBand(5, 'Documents Verified');
+        $pdf->checkboxGrid(self::pdfFlags(VisitReport::DOCUMENT_FLAGS, $report), 3);
+
+        $pdf->sectionBand(6, 'BC Supervisor / DRA Observations');
+        $pdf->paragraph(
+            ($details['agent_observation'] ?? '') === '' ? 'No observations recorded.' : (string) $details['agent_observation'],
+            9.0,
+            '#1c2128'
+        );
+
+        $pdf->sectionBand(7, 'Recommendation');
+        $pdf->checkboxGrid(self::pdfFlags(VisitReport::CKCC_OD_RECOMMENDATION_FLAGS, $details), 3);
+        if (($details['rec_other_text'] ?? '') !== '') {
+            $pdf->paragraph('Other: ' . (string) $details['rec_other_text'], 8.2, '#1c2128');
+        }
+
+        $pdf->sectionBand(8, 'Final Report Status');
+        $pdf->checkboxGrid(self::pdfFlags(VisitReport::CKCC_OD_STATUS_FLAGS, $details), 3);
+
+        $pdf->sectionBand(9, 'Declaration');
+        $pdf->calloutBox(VisitReport::DECLARATION);
+
+        $pdf->sectionBand(10, 'Certification');
+        $pdf->groupLabel('BC Supervisor');
+        $pdf->formFields([
+            'Name'      => $report['agent_name'],
+            'BCBF Code' => $report['bcbf_code'] ?? $report['bc_code'],
+        ], 2);
+        $pdf->paragraph('To be signed by hand on this printed copy. Sign above the line.', 8.4, '#4b5563');
+        // No Borrower Signature block, by design - see the note in pdf() above.
+        $pdf->signatureBlock([[
+            'label'   => 'BC Supervisor Signature',
+            'caption' => (string) $report['agent_name'] . "\nDate:",
+        ]], 60.0, 16.0, 2);
+
+        $pdf->groupLabel('Supervisor Verification');
+        $pdf->formFields([
+            'Name'        => $report['supervisor_name'],
+            'Designation' => $report['supervisor_designation'],
+            'BCBF Code'   => $report['supervisor_employee_id'],
+        ], 3);
+        $supervisorName = trim((string) ($report['supervisor_name'] ?? ''));
+        $pdf->signatureBlock([[
+            'label'   => 'Supervisor Signature',
+            'caption' => ($supervisorName !== '' ? $supervisorName : 'Supervisor') . "\nDate:",
+        ]], 60.0, 16.0, 2);
+
+        $this->logExport('Visits', sprintf('Exported CKCC OD Field Report #%d to PDF', $id));
+
+        Response::download(
+            $pdf->output(),
+            sprintf('lrms_ckcc_od_%s_%d.pdf', (string) $report['loan_account_number'], $id),
+            Pdf::MIME
+        );
+    }
+
+    /**
+     * Printable CKCC NPA Accounts under KRM OTS Scheme Field Report.
+     *
+     * ADD-ON: entirely separate from pdf() above. No Borrower Signature block.
+     */
+    public function pdfNpaOts(Request $request): void
+    {
+        $this->guard($request, 'visits.view');
+
+        $report = $this->load($request);
+        $id = (int) $report['id'];
+        $details = VisitReport::npaOtsDetails($id);
+
+        if ($details === null) {
+            $this->back('/visits/' . $id, 'danger', 'This report has no CKCC NPA / KRM OTS Field Report section.');
+        }
+
+        $organisation = trim((string) Settings::get('report_org_name', '')) !== ''
+            ? (string) Settings::get('report_org_name')
+            : 'D2 Recovery Solutions & Services';
+
+        $pdf = new Pdf(
+            'CKCC NPA - KRM OTS Scheme Field Report',
+            sprintf(
+                '%s · %s · %s',
+                (string) $report['loan_account_number'],
+                (string) $report['customer_name'],
+                fmt_date((string) $report['visit_date'])
+            ),
+            false,
+            'D2 Recovery Solutions & Services confidential - field verification record'
+        );
+        $pdf->useRunningHeader($organisation . '  |  CKCC NPA - KRM OTS Scheme Field Report');
+        $pdf->titleBlock($organisation, 'CKCC NPA Accounts under KRM OTS Scheme', [
+            'Field Verification Report for NPA Accounts under the KRM OTS Scheme',
+            "RBI Guidelines & Bank's Code of Conduct Compliant Format",
+        ]);
+
+        $pdf->sectionBand(1, 'General Information');
+        $pdf->formFields([
+            'Visit Date'          => fmt_date((string) $report['visit_date']),
+            'Visit Time'          => fmt_time((string) $report['visit_time']),
+            'Branch Name'         => $report['branch_name'] ?: $report['branch_display_name'],
+            'BC Supervisor Name'  => $report['agent_name'],
+            'BCBF Code'           => $report['bcbf_code'] ?? $report['bc_code'],
+            'Village / Location'  => $report['village'],
+        ], 2);
+
+        $pdf->sectionBand(2, 'Borrower Information');
+        $pdf->formFields([
+            'Borrower Name'              => $report['customer_name'],
+            "Father's / Husband's Name"  => $report['father_husband_name'],
+            'Mobile Number'              => $report['mobile_masked'],
+            'Aadhaar (Last 4 Digits)'    => $report['aadhaar_masked'],
+        ], 2);
+
+        $pdf->sectionBand(3, 'NPA Account Details');
+        $pdf->formFields([
+            'Loan Account Number' => $report['loan_account_number'],
+            'CIF Number'          => $details['cif_number'] ?? $report['cif_number'],
+            'Sanction Limit'      => self::pdfMoney($details['sanction_limit']),
+            'Drawing Power'       => self::pdfMoney($details['drawing_power']),
+            'Outstanding Amount'  => self::pdfMoney($details['outstanding_amount']),
+            'Interest Overdue'    => self::pdfMoney($details['interest_overdue']),
+            'NPA Date'            => $details['npa_date'] === null ? '-' : fmt_date((string) $details['npa_date']),
+            'Days Past Due'       => $details['days_past_due'] === null ? '-' : (string) $details['days_past_due'],
+        ], 2);
+
+        $pdf->groupLabel('Asset Classification');
+        $pdf->checkboxGrid(
+            self::pdfOptions(VisitReport::ASSET_CLASSIFICATIONS, $details['asset_classification'] ?? null),
+            3
+        );
+
+        $pdf->sectionBand(4, 'KRM OTS Settlement Details');
+        $pdf->groupLabel('Eligible for KRM OTS');
+        $pdf->checkboxGrid(self::pdfYesNo((int) $details['eligible_for_ots'] === 1), 3);
+
+        $pdf->groupLabel('Applicable Scheme');
+        $pdf->checkboxGrid(self::pdfOptions(VisitReport::NPA_OTS_SCHEMES, $details['scheme'] ?? null), 3);
+        if (($details['scheme_other_text'] ?? '') !== '') {
+            $pdf->paragraph('Other scheme: ' . (string) $details['scheme_other_text'], 8.2, '#1c2128');
+        }
+
+        $pdf->formFields([
+            'Relief / Waiver'          => self::pdfPercent($details['relief_percent']),
+            'Residual Loan Balance'    => self::pdfMoney($details['rlb_amount']),
+            'Payable Percent'          => self::pdfPercent($details['payable_percent']),
+            "Borrower's Share"         => self::pdfMoney($details['payable_amount']),
+            'Proposed Settlement'      => self::pdfMoney($details['total_settlement']),
+            'Initial Deposit Required' => self::pdfMoney($details['required_deposit']),
+        ], 2);
+
+        $pdf->formFields([
+            'Deposit Received'      => ((int) $details['deposit_received'] === 1) ? 'Yes' : 'No',
+            'Deposit Paid'          => self::pdfMoney($details['deposit_amount']),
+            'Deposit Date'          => $details['deposit_date'] === null ? '-' : fmt_date((string) $details['deposit_date']),
+            "Bank's Receipt / Txn"  => $details['deposit_reference'] ?? '-',
+            'Balance Payable'       => self::pdfMoney($details['balance_payable']),
+            'Final Payment Date'    => $details['final_payment_date'] === null ? '-' : fmt_date((string) $details['final_payment_date']),
+        ], 2);
+
+        $pdf->paragraph(
+            'Any deposit shown here was paid by the borrower at the bank. The agent does '
+            . 'not collect money and this system records no cash handled by an agent.',
+            8.0,
+            '#6b7280'
+        );
+
+        $pdf->formFields([
+            'Approval Status'  => VisitReport::NPA_OTS_APPROVAL_STATUSES[$details['approval_status'] ?? ''] ?? '-',
+            'Validity'         => ($details['validity_from'] === null ? '-' : fmt_date((string) $details['validity_from']))
+                . ' to ' . ($details['validity_to'] === null ? '-' : fmt_date((string) $details['validity_to'])),
+            'Expected Closure' => $details['expected_closure_date'] === null
+                ? '-' : fmt_date((string) $details['expected_closure_date']),
+        ], 2);
+
+        $pdf->groupLabel('Borrower Response');
+        $pdf->checkboxGrid(
+            self::pdfOptions(VisitReport::NPA_OTS_BORROWER_RESPONSES, $details['borrower_response'] ?? null),
+            3
+        );
+        if (($details['rejection_reason'] ?? '') !== '') {
+            $pdf->paragraph('Why the borrower declined: ' . (string) $details['rejection_reason'], 8.6, '#8a5a00');
+        }
+
+        $pdf->sectionBand(5, 'Physical Verification');
+        $pdf->checkboxGrid(self::pdfFlags(VisitReport::CONTACT_FLAGS, $report), 3);
+
+        $pdf->sectionBand(6, 'Documents Verified');
+        $pdf->checkboxGrid(self::pdfFlags(VisitReport::DOCUMENT_FLAGS, $report), 3);
+
+        $pdf->sectionBand(7, 'BC Supervisor / DRA Observations');
+        $pdf->paragraph(
+            ($details['observation'] ?? '') === '' ? 'No observations recorded.' : (string) $details['observation'],
+            9.0,
+            '#1c2128'
+        );
+
+        $pdf->sectionBand(8, 'Recommendation');
+        $pdf->checkboxGrid(self::pdfFlags(VisitReport::NPA_OTS_RECOMMENDATION_FLAGS, $details), 3);
+
+        $pdf->sectionBand(9, 'Final Report Status');
+        $pdf->checkboxGrid(self::pdfFlags(VisitReport::NPA_OTS_STATUS_FLAGS, $details), 3);
+
+        $pdf->sectionBand(10, 'Declaration');
+        $pdf->calloutBox(VisitReport::DECLARATION);
+
+        $pdf->sectionBand(11, 'Certification');
+        $pdf->groupLabel('BC Supervisor');
+        $pdf->formFields([
+            'Name'      => $report['agent_name'],
+            'BCBF Code' => $report['bcbf_code'] ?? $report['bc_code'],
+        ], 2);
+        $pdf->paragraph('To be signed by hand on this printed copy. Sign above the line.', 8.4, '#4b5563');
+        // No Borrower Signature block, by design.
+        $pdf->signatureBlock([[
+            'label'   => 'BC Supervisor Signature',
+            'caption' => (string) $report['agent_name'] . "\nDate:",
+        ]], 60.0, 16.0, 2);
+
+        $pdf->groupLabel('Supervisor Verification');
+        $pdf->formFields([
+            'Name'        => $report['supervisor_name'],
+            'Designation' => $report['supervisor_designation'],
+            'BCBF Code'   => $report['supervisor_employee_id'],
+        ], 3);
+        $supervisorName = trim((string) ($report['supervisor_name'] ?? ''));
+        $pdf->signatureBlock([[
+            'label'   => 'Supervisor Signature',
+            'caption' => ($supervisorName !== '' ? $supervisorName : 'Supervisor') . "\nDate:",
+        ]], 60.0, 16.0, 2);
+
+        $this->logExport('Visits', sprintf('Exported CKCC NPA / KRM OTS Field Report #%d to PDF', $id));
+
+        Response::download(
+            $pdf->output(),
+            sprintf('lrms_ckcc_npa_ots_%s_%d.pdf', (string) $report['loan_account_number'], $id),
             Pdf::MIME
         );
     }
@@ -1156,7 +1490,7 @@ final class VisitController extends Controller
             'aadhaar'      => 'Aadhaar',
             'passbook'     => 'Passbook',
             'renewal_form' => 'Renewal Form',
-            'agent'        => 'BC Agent',
+            'agent'        => 'BC Supervisor',
             'other'        => 'Other',
         ][$photoType] ?? ucwords(str_replace('_', ' ', $photoType));
     }

@@ -538,6 +538,7 @@ abstract class Controller
             'branch_name'          => $user['branch_name'] === null ? null : (string) $user['branch_name'],
             'branch_code'          => $user['branch_code'] === null ? null : (string) $user['branch_code'],
             'bc_code'              => $user['bc_code'] === null ? null : (string) $user['bc_code'],
+            'bcbf_code'            => $user['bcbf_code'] === null ? null : (string) $user['bcbf_code'],
             'designation'          => $user['designation'] === null ? null : (string) $user['designation'],
             'must_change_password' => (int) $user['must_change_password'] === 1,
             'permissions'          => Auth::isSuperAdmin() ? ['*'] : Auth::permissions(),

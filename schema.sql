@@ -494,6 +494,11 @@ CREATE TABLE `visit_reports` (
   `visit_date`           DATE         NOT NULL,
   `visit_time`           TIME         NOT NULL,
   `bc_code`              VARCHAR(40)  DEFAULT NULL COMMENT 'BC Code / DRA ID',
+  -- The staff member's BCBF code, snapshotted the same way agent_name is: a report
+  -- printed after the code on the user record changes must still show the code that
+  -- was current on the day of the visit. Falls back to users.bcbf_code at submit time
+  -- when the app did not send one.
+  `bcbf_code`            VARCHAR(40)  DEFAULT NULL COMMENT 'BCBF code, snapshot',
   `agent_name`           VARCHAR(150) NOT NULL COMMENT 'snapshot',
   `branch_name`          VARCHAR(150) DEFAULT NULL COMMENT 'snapshot',
   `village`              VARCHAR(150) DEFAULT NULL COMMENT 'where the visit happened',
@@ -510,13 +515,23 @@ CREATE TABLE `visit_reports` (
 
   -- Which kind of case this is - the printed form calls it "Case Type". The
   -- sections common to every type live in this table; the extra ones live in
-  -- visit_ots_details / visit_ckcc_details so that this row does not grow another
-  -- fifty mostly-null columns.
+  -- visit_ots_details / visit_ckcc_details / visit_ckcc_od_details /
+  -- visit_npa_ots_details so that this row does not grow another fifty
+  -- mostly-null columns.
   --
   -- 'pre_npa' and 'post_npa' are not settlement or renewal work: they are the same
   -- doorstep verification done before an account slips and after it has, and they
   -- were being filed as plain recovery calls because there was nothing else to pick.
-  `report_type`          ENUM('recovery','ots','ckcc_renewal','pre_npa','post_npa','other')
+  --
+  -- 'ckcc_od' and 'ckcc_npa_ots' are two later, deliberately separate additions:
+  -- 'ckcc_od' is a dedicated CKCC OD field report - it carries the same account
+  -- fields as 'ckcc_renewal' but is its own case type with its own detail table, so
+  -- adding it never touches a single row or column the existing CKCC OD-2 renewal
+  -- report reads. 'ckcc_npa_ots' is for NPA accounts being worked under the KRM OTS
+  -- scheme specifically - distinct from the general 'ots' case type, whose accounts
+  -- are not necessarily NPA yet.
+  `report_type`          ENUM('recovery','ots','ckcc_renewal','pre_npa','post_npa','other',
+                               'ckcc_od','ckcc_npa_ots')
                            NOT NULL DEFAULT 'recovery',
   `report_type_other_text` VARCHAR(150) DEFAULT NULL COMMENT 'when Case Type is Other',
 
@@ -949,6 +964,177 @@ CREATE TABLE `visit_ckcc_details` (
   KEY `idx_ckcc_bucket` (`renewal_due_bucket`),
   CONSTRAINT `fk_ckcc_visit` FOREIGN KEY (`visit_report_id`) REFERENCES `visit_reports` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_ckcc_loan`  FOREIGN KEY (`loan_account_id`) REFERENCES `loan_accounts` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- CKCC OD Field Report details  (report_type = 'ckcc_od')
+--
+-- A dedicated field report for CKCC OD cases, ADD-ON only: it is a sibling of
+-- visit_ckcc_details, not a replacement or a variant of it. Nothing here is read
+-- by the existing CKCC OD-2 Renewal report, and nothing in that report's queries,
+-- view or PDF section reads this table.
+--
+-- Carries the same account-snapshot and consent/status shape as CKCC OD-2 Renewal
+-- (so a branch reviewing either report sees a familiar layout) plus OD-specific
+-- fields (od_limit, od_utilization, last_credit_date) that a cash-credit/OD account
+-- needs and a renewal report does not ask for.
+--
+-- No Borrower Signature column exists here, matching the rest of this report
+-- family: a borrower signature on a bank-internal verification record would
+-- wrongly imply the borrower endorsed it, and where consent genuinely matters it
+-- is captured as a separate instrument (a renewal form / OTS consent letter).
+-- ============================================================================
+
+DROP TABLE IF EXISTS `visit_ckcc_od_details`;
+CREATE TABLE `visit_ckcc_od_details` (
+  `visit_report_id`  BIGINT UNSIGNED NOT NULL,
+  `loan_account_id`  BIGINT UNSIGNED NOT NULL,
+
+  -- ---- Account snapshot ----------------------------------------------------
+  `cif_number`         VARCHAR(40)   DEFAULT NULL,
+  `sanction_date`      DATE          DEFAULT NULL,
+  `sanction_limit`     DECIMAL(15,2) DEFAULT NULL,
+  `drawing_power`      DECIMAL(15,2) DEFAULT NULL,
+  `outstanding_amount` DECIMAL(15,2) DEFAULT NULL,
+  `interest_overdue`   DECIMAL(15,2) DEFAULT NULL,
+
+  -- ---- OD-specific fields ---------------------------------------------------
+  -- Not asked on the CKCC OD-2 Renewal report: an OD field visit is about the
+  -- overdraft facility's own running position, not a renewal deadline, so there
+  -- is deliberately no renewal_due_date / expected_npa_date / days_remaining here.
+  `od_limit`          DECIMAL(15,2) DEFAULT NULL,
+  `od_utilization`    DECIMAL(15,2) DEFAULT NULL,
+  `last_credit_date`  DATE          DEFAULT NULL,
+
+  -- ---- Eligibility / KYC ----------------------------------------------------
+  `eligible_for_renewal`     TINYINT(1) NOT NULL DEFAULT 0,
+  `kyc_status`               ENUM('complete','pending') DEFAULT NULL,
+  `aadhaar_seeded`           TINYINT(1) NOT NULL DEFAULT 0,
+  `mobile_linked`            TINYINT(1) NOT NULL DEFAULT 0,
+  `aadhaar_auth_completed`   TINYINT(1) NOT NULL DEFAULT 0,
+
+  -- ---- Consent ---------------------------------------------------------------
+  `willing_to_renew`      TINYINT(1) NOT NULL DEFAULT 0,
+  `documents_handed_over` TINYINT(1) NOT NULL DEFAULT 0,
+  `renewal_form_signed`   TINYINT(1) NOT NULL DEFAULT 0,
+  `ekyc_completed`        TINYINT(1) NOT NULL DEFAULT 0,
+  `biometrics_completed`  TINYINT(1) NOT NULL DEFAULT 0,
+
+  -- ---- Agent observation and recommendation ----------------------------------
+  `agent_observation`          TEXT DEFAULT NULL,
+  `rec_renew_immediately`      TINYINT(1) NOT NULL DEFAULT 0,
+  `rec_documents_submitted`    TINYINT(1) NOT NULL DEFAULT 0,
+  `rec_pending_documents`      TINYINT(1) NOT NULL DEFAULT 0,
+  `rec_followup_required`      TINYINT(1) NOT NULL DEFAULT 0,
+  `rec_not_interested`         TINYINT(1) NOT NULL DEFAULT 0,
+  `rec_branch_contact_urgent`  TINYINT(1) NOT NULL DEFAULT 0,
+  `rec_others`                 TINYINT(1) NOT NULL DEFAULT 0,
+  `rec_other_text`             VARCHAR(255) DEFAULT NULL,
+
+  -- ---- Report status ----------------------------------------------------------
+  `st_customer_contacted`     TINYINT(1) NOT NULL DEFAULT 0,
+  `st_customer_verified`      TINYINT(1) NOT NULL DEFAULT 0,
+  `st_documents_collected`    TINYINT(1) NOT NULL DEFAULT 0,
+  `st_application_submitted`  TINYINT(1) NOT NULL DEFAULT 0,
+  `st_renewed`                TINYINT(1) NOT NULL DEFAULT 0,
+  `st_pending_at_branch`      TINYINT(1) NOT NULL DEFAULT 0,
+  `st_followup_required`      TINYINT(1) NOT NULL DEFAULT 0,
+  `st_became_npa`             TINYINT(1) NOT NULL DEFAULT 0,
+
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  PRIMARY KEY (`visit_report_id`),
+  KEY `idx_ckcc_od_loan` (`loan_account_id`),
+  CONSTRAINT `fk_ckcc_od_visit` FOREIGN KEY (`visit_report_id`) REFERENCES `visit_reports` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_ckcc_od_loan`  FOREIGN KEY (`loan_account_id`) REFERENCES `loan_accounts` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- CKCC NPA Accounts under KRM OTS Scheme Field Report details
+-- (report_type = 'ckcc_npa_ots')
+--
+-- A dedicated field report for NPA accounts being settled under the KRM OTS
+-- scheme. A sibling of visit_ots_details, not a replacement: the general 'ots'
+-- case type stays exactly as it is, and this table is read by nothing else.
+--
+-- Combines NPA account facts (npa_date, days_past_due, asset_classification) with
+-- the same settlement/deposit arithmetic shape as the general OTS report, because
+-- an NPA-under-KRM-OTS visit is both things at once: confirmation of the NPA
+-- position and progress on its settlement.
+--
+-- No Borrower Signature column here either.
+-- ============================================================================
+
+DROP TABLE IF EXISTS `visit_npa_ots_details`;
+CREATE TABLE `visit_npa_ots_details` (
+  `visit_report_id`  BIGINT UNSIGNED NOT NULL,
+  `loan_account_id`  BIGINT UNSIGNED NOT NULL,
+
+  -- ---- Account snapshot ------------------------------------------------------
+  `cif_number`           VARCHAR(40)   DEFAULT NULL,
+  `sanction_date`        DATE          DEFAULT NULL,
+  `sanction_limit`       DECIMAL(15,2) DEFAULT NULL,
+  `drawing_power`        DECIMAL(15,2) DEFAULT NULL,
+  `outstanding_amount`   DECIMAL(15,2) DEFAULT NULL,
+  `interest_overdue`     DECIMAL(15,2) DEFAULT NULL,
+  `npa_date`             DATE          DEFAULT NULL,
+  `days_past_due`        INT           DEFAULT NULL,
+  `asset_classification` ENUM('standard','sma_0','sma_1','sma_2','npa') DEFAULT NULL,
+
+  -- ---- Settlement arithmetic --------------------------------------------------
+  `eligible_for_ots`         TINYINT(1) NOT NULL DEFAULT 0,
+  `scheme`                   ENUM('krm_ots','general_ots','other') DEFAULT NULL,
+  `scheme_other_text`        VARCHAR(150) DEFAULT NULL,
+  `relief_percent`           DECIMAL(5,2)  DEFAULT NULL,
+  `rlb_amount`                DECIMAL(15,2) DEFAULT NULL,
+  `payable_percent`          DECIMAL(5,2)  DEFAULT NULL,
+  `payable_amount`           DECIMAL(15,2) DEFAULT NULL,
+  `total_settlement`         DECIMAL(15,2) DEFAULT NULL,
+
+  -- ---- Initial deposit (paid by the borrower AT THE BANK) ----------------------
+  `deposit_percent`          DECIMAL(5,2)  DEFAULT NULL,
+  `required_deposit`         DECIMAL(15,2) DEFAULT NULL,
+  `deposit_received`         TINYINT(1) NOT NULL DEFAULT 0,
+  `deposit_amount`           DECIMAL(15,2) DEFAULT NULL,
+  `deposit_date`             DATE          DEFAULT NULL,
+  `deposit_reference`        VARCHAR(120)  DEFAULT NULL COMMENT "bank's receipt no. / transaction id",
+  `balance_payable`          DECIMAL(15,2) DEFAULT NULL,
+  `final_payment_date`       DATE          DEFAULT NULL,
+
+  -- ---- Approval and validity ---------------------------------------------------
+  `approval_status`       ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+  `validity_from`         DATE DEFAULT NULL,
+  `validity_to`           DATE DEFAULT NULL,
+  `expected_closure_date` DATE DEFAULT NULL,
+
+  -- ---- Borrower's response -------------------------------------------------------
+  `borrower_response`  ENUM('accepted','requested_time','financial_difficulty',
+                             'refused','not_available') DEFAULT NULL,
+  `rejection_reason`   VARCHAR(500) DEFAULT NULL,
+
+  -- ---- Agent observation and recommendation ---------------------------------------
+  `observation`               TEXT DEFAULT NULL,
+  `rec_proposal_recommended`  TINYINT(1) NOT NULL DEFAULT 0,
+  `rec_followup_required`     TINYINT(1) NOT NULL DEFAULT 0,
+  `rec_customer_refused`      TINYINT(1) NOT NULL DEFAULT 0,
+  `rec_not_eligible`          TINYINT(1) NOT NULL DEFAULT 0,
+
+  -- ---- Final report status ---------------------------------------------------------
+  `st_customer_contacted`       TINYINT(1) NOT NULL DEFAULT 0,
+  `st_customer_verified`        TINYINT(1) NOT NULL DEFAULT 0,
+  `st_ots_accepted`             TINYINT(1) NOT NULL DEFAULT 0,
+  `st_ots_rejected`             TINYINT(1) NOT NULL DEFAULT 0,
+  `st_initial_deposit_received` TINYINT(1) NOT NULL DEFAULT 0,
+  `st_ots_closed`               TINYINT(1) NOT NULL DEFAULT 0,
+  `st_followup_required`        TINYINT(1) NOT NULL DEFAULT 0,
+
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  PRIMARY KEY (`visit_report_id`),
+  KEY `idx_npa_ots_loan` (`loan_account_id`),
+  KEY `idx_npa_ots_status` (`approval_status`),
+  CONSTRAINT `fk_npa_ots_visit` FOREIGN KEY (`visit_report_id`) REFERENCES `visit_reports` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_npa_ots_loan`  FOREIGN KEY (`loan_account_id`) REFERENCES `loan_accounts` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DROP TABLE IF EXISTS `promises`;
@@ -1668,11 +1854,16 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- SEED: ROLES
 -- ============================================================================
 
+-- Display names only, chosen by the bank's own terminology. The slugs
+-- (super_admin / branch_manager / agent / auditor) are referenced by string
+-- literal throughout the codebase (Auth::isSuperAdmin(), User::agents(), etc.)
+-- and are deliberately left unchanged so no role check has to change alongside
+-- the label a user actually sees.
 INSERT INTO `roles` (`id`, `slug`, `display_name`, `description`, `is_system`) VALUES
-  (1, 'super_admin',    'Super Admin',    'Full system access across all branches',        1),
-  (2, 'branch_manager', 'Branch Manager', 'Scoped to the assigned branch only',            1),
-  (3, 'agent',          'BC Agent',       'Android app only - assigned leads and visits',  1),
-  (4, 'auditor',        'Auditor',        'Read-only access to reports and logs',          1);
+  (1, 'super_admin',    'Super Supervisor', 'Full system access across all branches',        1),
+  (2, 'branch_manager', 'Branch Manager',   'Scoped to the assigned branch only',            1),
+  (3, 'agent',          'BC Supervisor',    'Android app only - assigned leads and visits',  1),
+  (4, 'auditor',        'Auditor',          'Read-only access to reports and logs',          1);
 
 -- ============================================================================
 -- SEED: PERMISSIONS

@@ -66,7 +66,7 @@ final class RoleController extends Controller
         // there could lock every administrator out of the system.
         if ((string) $role['slug'] === 'super_admin') {
             $this->back('/roles?role_id=' . $roleId, 'warning',
-                'The Super Admin role always holds every permission and cannot be edited.');
+                'The Super Supervisor role always holds every permission and cannot be edited.');
         }
 
         $submitted = $request->intArr('permissions');

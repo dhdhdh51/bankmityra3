@@ -38,7 +38,7 @@ $sortIcon = static function (string $field): string {
 <div class="lrms-page-head">
     <div>
         <h1>BC Supervisor Visits</h1>
-        <p>Supervisor visit reports for BC Agents assessment</p>
+        <p>Supervisor visit reports for BC Supervisors assessment</p>
     </div>
     <div>
         <a href="<?= e(url('/bc/visit/create')) ?>" class="btn btn-primary">
@@ -104,7 +104,7 @@ $sortIcon = static function (string $field): string {
             <thead>
                 <tr>
                     <th><a href="<?= e($sortUrl('visit_date')) ?>" class="text-decoration-none">Visit Date<?= $sortIcon('visit_date') ?></a></th>
-                    <th><a href="<?= e($sortUrl('bca_name')) ?>" class="text-decoration-none">BC Agent<?= $sortIcon('bca_name') ?></a></th>
+                    <th><a href="<?= e($sortUrl('bca_name')) ?>" class="text-decoration-none">BC Supervisor<?= $sortIcon('bca_name') ?></a></th>
                     <th><a href="<?= e($sortUrl('branch_name')) ?>" class="text-decoration-none">Branch<?= $sortIcon('branch_name') ?></a></th>
                     <th>BC Code</th>
                     <th style="width:120px">Actions</th>

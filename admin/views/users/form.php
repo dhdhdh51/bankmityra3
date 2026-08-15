@@ -29,7 +29,7 @@ $currentBranchId = (string) ($old['branch_id'] ?? ($user['branch_id'] ?? ''));
 <div class="lrms-page-head">
     <div>
         <nav aria-label="Breadcrumb" class="mb-1" style="font-size:.75rem">
-            <a href="<?= e(url('/users')) ?>" class="text-muted">Managers &amp; Agents</a>
+            <a href="<?= e(url('/users')) ?>" class="text-muted">Managers &amp; Supervisors</a>
             <span class="text-muted mx-1">/</span>
             <span class="text-muted"><?= $isEdit ? 'Edit' : 'New' ?></span>
         </nav>
@@ -37,7 +37,7 @@ $currentBranchId = (string) ($old['branch_id'] ?? ($user['branch_id'] ?? ''));
         <p>
             <?= $isEdit
                 ? e((string) $user['name']) . ' · ' . e((string) $user['employee_code'])
-                : 'Create a branch manager or BC agent account' ?>
+                : 'Create a branch manager or BC Supervisor account' ?>
         </p>
     </div>
 </div>
@@ -103,14 +103,14 @@ $currentBranchId = (string) ($old['branch_id'] ?? ($user['branch_id'] ?? ''));
                                 <?php endforeach; ?>
                             </select>
                             <?= field_error($errors, 'role_id') ?>
-                            <div class="form-text">BC Agents sign in through the Android app only.</div>
+                            <div class="form-text">BC Supervisors sign in through the Android app only.</div>
                         </div>
 
                         <?php if (count($branches) > 1): ?>
                             <div class="col-md-6">
                                 <label class="form-label" for="branch_id">Branch</label>
                                 <select class="form-select" id="branch_id" name="branch_id">
-                                    <option value="">None (Super Admin only)</option>
+                                    <option value="">None (Super Supervisor only)</option>
                                     <?php foreach ($branches as $branch): ?>
                                         <option value="<?= e((string) $branch['id']) ?>"
                                             <?= $currentBranchId === (string) $branch['id'] ? 'selected' : '' ?>>
@@ -118,7 +118,7 @@ $currentBranchId = (string) ($old['branch_id'] ?? ($user['branch_id'] ?? ''));
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
-                                <div class="form-text">Required for every role except Super Admin.</div>
+                                <div class="form-text">Required for every role except Super Supervisor.</div>
                             </div>
                         <?php else: ?>
                             <input type="hidden" name="branch_id" value="<?= e((string) ($branches[0]['id'] ?? '')) ?>">
@@ -177,10 +177,15 @@ $currentBranchId = (string) ($old['branch_id'] ?? ($user['branch_id'] ?? ''));
 
                         <div class="col-md-6">
                             <label class="form-label" for="bcbf_code">BCBF Code</label>
-                            <input type="text" class="form-control<?= has_error($errors, 'bcbf_code') ?>"
-                                   id="bcbf_code" name="bcbf_code" value="<?= $value('bcbf_code') ?>" maxlength="40">
-                            <?= field_error($errors, 'bcbf_code') ?>
-                            <div class="form-text">Issued by the bank; separate from the BC code above.</div>
+                            <?php if ($isEdit): ?>
+                                <input type="text" class="form-control" id="bcbf_code"
+                                       value="<?= $value('bcbf_code', 'Not yet assigned') ?>" readonly disabled>
+                                <div class="form-text">Assigned automatically when this account was created; not editable.</div>
+                            <?php else: ?>
+                                <input type="text" class="form-control" id="bcbf_code"
+                                       value="Generated automatically on save" readonly disabled>
+                                <div class="form-text">A BCBF Code is assigned automatically once this account is created.</div>
+                            <?php endif; ?>
                         </div>
 
                         <div class="col-md-6">

@@ -10,6 +10,9 @@ $icons = [
     'loan-type' => 'money',
     'agent'     => 'users',
     'promise'   => 'handshake',
+    // ADD-ONs
+    'ckcc-od'      => 'pdf',
+    'ckcc-npa-krm' => 'pdf',
 ];
 ?>
 
@@ -36,6 +39,6 @@ $icons = [
 <div class="lrms-card mt-3">
     <div class="lrms-card-body" style="font-size:.8438rem;color:var(--lrms-slate)">
         <strong>Note:</strong> every report respects your access scope. Branch Managers see only their own
-        branch; Super Admins can filter across all branches. Exports are recorded in the activity log.
+        branch; Super Supervisors can filter across all branches. Exports are recorded in the activity log.
     </div>
 </div>

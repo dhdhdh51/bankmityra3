@@ -13,8 +13,8 @@
         <?= icon('alert') ?>
         <div>
             The SMS gateway is not configured yet, so OTP delivery is unavailable.
-            Ask your Super Admin to reset your password from
-            <strong>Managers &amp; Agents</strong>.
+            Ask your Super Supervisor to reset your password from
+            <strong>Managers &amp; Supervisors</strong>.
         </div>
     </div>
 <?php endif; ?>

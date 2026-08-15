@@ -16,9 +16,9 @@ use App\Models\User;
 /**
  * BC Supervisor visit reports.
  *
- * Supervisors visit BC Agents to assess their performance, equipment, documentation,
+ * Supervisors visit BC Supervisors to assess their performance, equipment, documentation,
  * and remuneration. This controller manages the collection and viewing of these visits,
- * with auto-population of BC Agent details from their user record.
+ * with auto-population of BC Supervisor details from their user record.
  */
 final class BcVisitController extends Controller
 {
@@ -194,7 +194,7 @@ final class BcVisitController extends Controller
 
     /**
      * API endpoint to load agent details and return as JSON.
-     * Called via AJAX when a BC Agent is selected in the form.
+     * Called via AJAX when a BC Supervisor is selected in the form.
      *
      * Returns: {id, name, bc_code, sp_cbc_name, branch_name, iibf_number, ssa, link_branch, region_ro}
      */
@@ -240,7 +240,7 @@ final class BcVisitController extends Controller
         $labels = [
             'visit_date' => 'Visit date',
             'visit_time' => 'Visit time',
-            'user_id' => 'BC Agent',
+            'user_id' => 'BC Supervisor',
             'qualification' => 'Qualification',
             'age' => 'Age',
             'address_contact' => 'Address/Contact',

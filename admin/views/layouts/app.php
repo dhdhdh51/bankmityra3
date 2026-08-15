@@ -167,7 +167,7 @@ $unread = $unreadNotifications ?? 0;
 
                 <?php if (can('users.view')): ?>
                     <a class="lrms-nav-item<?= active_nav('/users', $currentPath) ?>" href="<?= e(url('/users')) ?>">
-                        <?= icon('users') ?> Managers &amp; Agents
+                        <?= icon('users') ?> Managers &amp; Supervisors
                     </a>
                 <?php endif; ?>
 

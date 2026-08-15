@@ -85,6 +85,7 @@ final class VisitController extends Controller
             'id'        => (int) $user['id'],
             'name'      => (string) $user['name'],
             'bc_code'   => $user['bc_code'] === null ? null : (string) $user['bc_code'],
+            'bcbf_code' => $user['bcbf_code'] === null ? null : (string) $user['bcbf_code'],
             'branch_id' => $user['branch_id'] === null ? null : (int) $user['branch_id'],
         ];
 
@@ -194,11 +195,17 @@ final class VisitController extends Controller
         // and an empty object would produce a heading over nothing.
         $ots = VisitReport::otsDetails($id);
         $ckcc = VisitReport::ckccDetails($id);
+        // ADD-ON sections. Independent lookups, only ever populated for their own
+        // report_type, so they never affect the two above.
+        $ckccOd = VisitReport::ckccOdDetails($id);
+        $npaOts = VisitReport::npaOtsDetails($id);
 
         Response::success([
             'report'     => $this->presentVisitFull($report, $withPii),
             'ots'        => $ots === null ? null : $this->presentOts($ots),
             'ckcc'       => $ckcc === null ? null : $this->presentCkcc($ckcc),
+            'ckcc_od'    => $ckccOd === null ? null : $this->presentCkccOd($ckccOd),
+            'npa_ots'    => $npaOts === null ? null : $this->presentNpaOts($npaOts),
             'photos'     => array_map(fn (array $m): array => $this->presentMedia($m, 'photo'), VisitReport::photos($id)),
             'documents'  => array_map(fn (array $m): array => $this->presentMedia($m, 'document'), VisitReport::documents($id)),
         ]);
@@ -266,6 +273,29 @@ final class VisitController extends Controller
                 'consent_flags'        => $this->flagList(VisitReport::CKCC_CONSENT_FLAGS),
                 'recommendation_flags' => $this->flagList(VisitReport::CKCC_RECOMMENDATION_FLAGS),
                 'status_flags'         => $this->flagList(VisitReport::CKCC_STATUS_FLAGS),
+            ],
+
+            // ADD-ON: CKCC OD Field Report. Same shape as `ckcc` above, minus
+            // due_buckets (no renewal deadline in this report).
+            'ckcc_od' => [
+                'kyc_statuses'         => $this->optionList(VisitReport::CKCC_OD_KYC_STATUSES),
+                'eligibility_flags'    => $this->flagList(VisitReport::CKCC_OD_ELIGIBILITY_FLAGS),
+                'consent_flags'        => $this->flagList(VisitReport::CKCC_OD_CONSENT_FLAGS),
+                'recommendation_flags' => $this->flagList(VisitReport::CKCC_OD_RECOMMENDATION_FLAGS),
+                'status_flags'         => $this->flagList(VisitReport::CKCC_OD_STATUS_FLAGS),
+            ],
+
+            // ADD-ON: CKCC NPA Accounts under KRM OTS Scheme Field Report. Same
+            // shape as `ots` above, plus NPA account fields (npa_date, days_past_due,
+            // asset_classification) that the general OTS report snapshots from the
+            // account automatically rather than asking for directly.
+            'npa_ots' => [
+                'schemes'              => $this->optionList(VisitReport::NPA_OTS_SCHEMES),
+                'approval_statuses'    => $this->optionList(VisitReport::NPA_OTS_APPROVAL_STATUSES),
+                'borrower_responses'   => $this->optionList(VisitReport::NPA_OTS_BORROWER_RESPONSES),
+                'recommendation_flags' => $this->flagList(VisitReport::NPA_OTS_RECOMMENDATION_FLAGS),
+                'status_flags'         => $this->flagList(VisitReport::NPA_OTS_STATUS_FLAGS),
+                'asset_classifications' => $this->optionList(VisitReport::ASSET_CLASSIFICATIONS),
             ],
         ]);
     }
@@ -407,6 +437,123 @@ final class VisitController extends Controller
             'report_status'  => $flags(VisitReport::CKCC_STATUS_FLAGS),
 
             'agent_observation' => $row['agent_observation'] === null ? null : (string) $row['agent_observation'],
+        ];
+    }
+
+    /**
+     * ADD-ON: CKCC OD Field Report. Mirrors presentCkcc() above, minus the
+     * renewal-deadline fields, plus the three OD-specific ones.
+     *
+     * @param array<string,mixed> $row
+     * @return array<string,mixed>
+     */
+    private function presentCkccOd(array $row): array
+    {
+        $flags = static function (array $map) use ($row): array {
+            $out = [];
+            foreach ($map as $key => $label) {
+                $out[] = [
+                    'key'     => $key,
+                    'label'   => $label,
+                    'checked' => (int) ($row[$key] ?? 0) === 1,
+                ];
+            }
+            return $out;
+        };
+
+        $amount = static fn (string $k): ?float => $row[$k] === null ? null : round((float) $row[$k], 2);
+        $date = static fn (string $k): ?string => $row[$k] === null ? null : (string) $row[$k];
+
+        return [
+            'cif_number'         => $row['cif_number'] === null ? null : (string) $row['cif_number'],
+            'sanction_date'      => $date('sanction_date'),
+            'sanction_limit'     => $amount('sanction_limit'),
+            'drawing_power'      => $amount('drawing_power'),
+            'outstanding_amount' => $amount('outstanding_amount'),
+            'interest_overdue'   => $amount('interest_overdue'),
+
+            'od_limit'         => $amount('od_limit'),
+            'od_utilization'   => $amount('od_utilization'),
+            'last_credit_date' => $date('last_credit_date'),
+
+            'eligible_for_renewal' => (int) $row['eligible_for_renewal'] === 1,
+            'kyc_status'           => $row['kyc_status'] === null ? null : (string) $row['kyc_status'],
+            'aadhaar_seeded'         => (int) $row['aadhaar_seeded'] === 1,
+            'mobile_linked'          => (int) $row['mobile_linked'] === 1,
+            'aadhaar_auth_completed' => (int) $row['aadhaar_auth_completed'] === 1,
+
+            'consent'         => $flags(VisitReport::CKCC_OD_CONSENT_FLAGS),
+            'recommendations' => $flags(VisitReport::CKCC_OD_RECOMMENDATION_FLAGS),
+            'rec_other_text'  => $row['rec_other_text'] === null ? null : (string) $row['rec_other_text'],
+            'report_status'   => $flags(VisitReport::CKCC_OD_STATUS_FLAGS),
+
+            'agent_observation' => $row['agent_observation'] === null ? null : (string) $row['agent_observation'],
+        ];
+    }
+
+    /**
+     * ADD-ON: CKCC NPA Accounts under KRM OTS Scheme Field Report. Mirrors
+     * presentOts() above, plus the NPA account fields.
+     *
+     * @param array<string,mixed> $row
+     * @return array<string,mixed>
+     */
+    private function presentNpaOts(array $row): array
+    {
+        $amount = static fn (string $k): ?float => $row[$k] === null ? null : round((float) $row[$k], 2);
+        $percent = static fn (string $k): ?float => $row[$k] === null ? null : round((float) $row[$k], 2);
+        $date = static fn (string $k): ?string => $row[$k] === null ? null : (string) $row[$k];
+
+        return [
+            'cif_number'         => $row['cif_number'] === null ? null : (string) $row['cif_number'],
+            'sanction_date'      => $date('sanction_date'),
+            'sanction_limit'     => $amount('sanction_limit'),
+            'drawing_power'      => $amount('drawing_power'),
+            'outstanding_amount' => $amount('outstanding_amount'),
+            'interest_overdue'   => $amount('interest_overdue'),
+            'npa_date'           => $date('npa_date'),
+            'days_past_due'      => $row['days_past_due'] === null ? null : (int) $row['days_past_due'],
+            'asset_classification' => $row['asset_classification'] === null ? null : (string) $row['asset_classification'],
+            'asset_classification_label' => $row['asset_classification'] === null
+                ? null
+                : (VisitReport::ASSET_CLASSIFICATIONS[(string) $row['asset_classification']] ?? null),
+
+            'eligible_for_ots'  => (int) $row['eligible_for_ots'] === 1,
+            'scheme'            => $row['scheme'] === null ? null : (string) $row['scheme'],
+            'scheme_label'      => $row['scheme'] === null
+                ? null
+                : (VisitReport::NPA_OTS_SCHEMES[(string) $row['scheme']] ?? (string) $row['scheme']),
+            'scheme_other_text' => $row['scheme_other_text'] === null ? null : (string) $row['scheme_other_text'],
+            'relief_percent'    => $percent('relief_percent'),
+            'rlb_amount'        => $amount('rlb_amount'),
+            'payable_percent'   => $percent('payable_percent'),
+            'payable_amount'    => $amount('payable_amount'),
+            'total_settlement'  => $amount('total_settlement'),
+
+            'deposit_percent'    => $percent('deposit_percent'),
+            'required_deposit'   => $amount('required_deposit'),
+            'deposit_received'   => (int) $row['deposit_received'] === 1,
+            'deposit_amount'     => $amount('deposit_amount'),
+            'deposit_date'       => $date('deposit_date'),
+            'deposit_reference'  => $row['deposit_reference'] === null ? null : (string) $row['deposit_reference'],
+            'balance_payable'    => $amount('balance_payable'),
+            'final_payment_date' => $date('final_payment_date'),
+
+            'approval_status'       => (string) $row['approval_status'],
+            'approval_status_label' => VisitReport::NPA_OTS_APPROVAL_STATUSES[(string) $row['approval_status']] ?? (string) $row['approval_status'],
+            'validity_from'         => $date('validity_from'),
+            'validity_to'           => $date('validity_to'),
+            'expected_closure_date' => $date('expected_closure_date'),
+
+            'borrower_response'       => $row['borrower_response'] === null ? null : (string) $row['borrower_response'],
+            'borrower_response_label' => $row['borrower_response'] === null
+                ? null
+                : (VisitReport::NPA_OTS_BORROWER_RESPONSES[(string) $row['borrower_response']] ?? null),
+            'rejection_reason' => $row['rejection_reason'] === null ? null : (string) $row['rejection_reason'],
+
+            'observation'     => $row['observation'] === null ? null : (string) $row['observation'],
+            'recommendations' => $this->flagStatesFor($row, VisitReport::NPA_OTS_RECOMMENDATION_FLAGS),
+            'report_status'   => $this->flagStatesFor($row, VisitReport::NPA_OTS_STATUS_FLAGS),
         ];
     }
 

@@ -250,7 +250,7 @@ $totalLeads = max(1, (int) $cards['total_leads']);
             <?php if ($data['top_agents'] === []): ?>
                 <?= \App\Core\View::partial('partials/empty', [
                     'heading'  => 'No agents yet',
-                    'message'  => 'Create BC agent accounts to start assigning leads.',
+                    'message'  => 'Create BC Supervisor accounts to start assigning leads.',
                     'iconName' => 'users',
                 ]) ?>
             <?php else: ?>

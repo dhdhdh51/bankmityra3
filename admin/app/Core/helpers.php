@@ -464,7 +464,7 @@ if (!function_exists('geo_source_badge')) {
 
 if (!function_exists('is_agent')) {
     /**
-     * Whether the signed-in user is a BC agent.
+     * Whether the signed-in user is a BC Supervisor.
      *
      * Used by the navigation, which has to mirror the `allowAgent` flags on the
      * controllers. A permission an agent holds is not the same thing as a screen an

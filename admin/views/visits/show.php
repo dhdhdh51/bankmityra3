@@ -4,8 +4,10 @@
  * report row (not from current customer data).
  *
  * @var array<string,mixed>       $report
- * @var array<string,mixed>|null  $ots   KRM / OTS settlement section, when filed
- * @var array<string,mixed>|null  $ckcc  CKCC OD-2 renewal section, when filed
+ * @var array<string,mixed>|null  $ots     KRM / OTS settlement section, when filed
+ * @var array<string,mixed>|null  $ckcc    CKCC OD-2 renewal section, when filed
+ * @var array<string,mixed>|null  $ckccOd  CKCC OD Field Report section, when filed (ADD-ON)
+ * @var array<string,mixed>|null  $npaOts  CKCC NPA / KRM OTS Field Report section, when filed (ADD-ON)
  * @var list<array<string,mixed>> $photos
  * @var list<array<string,mixed>> $documents
  */
@@ -62,7 +64,20 @@ foreach ($photos as $photo) {
         </p>
     </div>
 
-    <div class="d-flex gap-2 no-print">
+    <div class="d-flex gap-2 no-print flex-wrap">
+        <?php if ($ckccOd !== null): ?>
+            <!-- ADD-ON: separate PDF export for the CKCC OD Field Report, distinct
+                 from the general visit PDF below. -->
+            <a href="<?= e(url('/visits/' . (int) $report['id'] . '/pdf-ckcc-od')) ?>" class="btn btn-outline-primary btn-sm">
+                <?= icon('pdf') ?> CKCC OD Field Report (PDF)
+            </a>
+        <?php endif; ?>
+        <?php if ($npaOts !== null): ?>
+            <!-- ADD-ON: separate PDF export for the CKCC NPA / KRM OTS Field Report. -->
+            <a href="<?= e(url('/visits/' . (int) $report['id'] . '/pdf-npa-ots')) ?>" class="btn btn-outline-primary btn-sm">
+                <?= icon('pdf') ?> CKCC NPA / KRM OTS Field Report (PDF)
+            </a>
+        <?php endif; ?>
         <a href="<?= e(url('/visits/' . (int) $report['id'] . '/pdf')) ?>" class="btn btn-outline-secondary btn-sm">
             <?= icon('pdf') ?> Download PDF
         </a>
@@ -236,7 +251,7 @@ $revisionCount = (int) ($report['revision_count'] ?? 0);
                     <div><dt>Regional office</dt><dd><?= nullable($report['regional_office']) ?></dd></div>
                     <div><dt>Zone</dt><dd><?= nullable($report['zone']) ?></dd></div>
                     <div><dt>SP / CBC name</dt><dd><?= nullable($report['sp_cbc_name']) ?></dd></div>
-                    <div><dt>BC agent / DRA name</dt><dd><?= e($report['agent_name']) ?></dd></div>
+                    <div><dt>BC Supervisor / DRA name</dt><dd><?= e($report['agent_name']) ?></dd></div>
                     <div><dt>BC code / DRA ID</dt><dd><?= nullable($report['bc_code']) ?></dd></div>
                     <div><dt>Linked branch</dt><dd><?= nullable($report['linked_branch']) ?></dd></div>
                     <div><dt>District</dt><dd><?= nullable($report['district']) ?></dd></div>
@@ -590,11 +605,11 @@ $revisionCount = (int) ($report['revision_count'] ?? 0);
                     <?= $flagBlock(VisitReport::CKCC_CONSENT_FLAGS, $ckcc) ?>
 
                     <?php if (!empty($ckcc['agent_observation'])): ?>
-                        <h3 class="lrms-subhead mt-4">BC agent observation</h3>
+                        <h3 class="lrms-subhead mt-4">BC Supervisor observation</h3>
                         <p class="lrms-prose"><?= nl2br(e($ckcc['agent_observation'])) ?></p>
                     <?php endif; ?>
 
-                    <h3 class="lrms-subhead mt-4">BC agent recommendation</h3>
+                    <h3 class="lrms-subhead mt-4">BC Supervisor recommendation</h3>
                     <?= $flagBlock(VisitReport::CKCC_RECOMMENDATION_FLAGS, $ckcc) ?>
                     <?php if (!empty($ckcc['rec_other_text'])): ?>
                         <p class="text-muted mt-2">Other: <?= e($ckcc['rec_other_text']) ?></p>
@@ -606,9 +621,158 @@ $revisionCount = (int) ($report['revision_count'] ?? 0);
             </div>
         <?php endif; ?>
 
+        <!-- ================= ADD-ON: CKCC OD Field Report =================
+             A dedicated, separate report from CKCC OD-2 Renewal above. Same
+             account-snapshot shape, minus the renewal deadline, plus the three
+             OD-specific figures. No Borrower Signature, matching this report
+             family. Only rendered when the agent filed this section. -->
+        <?php if ($ckccOd !== null): ?>
+            <div class="lrms-card lrms-card-accent mb-3">
+                <div class="lrms-card-head">
+                    <h2>CKCC OD Field Report</h2>
+                    <?php if (!empty($ckccOd['kyc_status'])): ?>
+                        <span class="lrms-badge badge-pending"><?= e(ucfirst((string) $ckccOd['kyc_status'])) ?> KYC</span>
+                    <?php endif; ?>
+                </div>
+                <div class="lrms-card-body">
+                    <p class="lrms-note">Supervisor: <?= e($report['agent_name']) ?> &middot; BCBF Code: <?= nullable($report['bcbf_code'] ?? $report['bc_code'] ?? null) ?></p>
+
+                    <dl class="lrms-dl">
+                        <div><dt>CIF number</dt><dd><?= nullable($ckccOd['cif_number']) ?></dd></div>
+                        <div><dt>Sanction date</dt><dd><?= $ckccOd['sanction_date'] === null ? '&mdash;' : fmt_date($ckccOd['sanction_date']) ?></dd></div>
+                        <div><dt>Sanction limit</dt><dd><?= e(rupees($ckccOd['sanction_limit'])) ?></dd></div>
+                        <div><dt>Drawing power</dt><dd><?= e(rupees($ckccOd['drawing_power'])) ?></dd></div>
+                        <div><dt>Outstanding</dt><dd><?= e(rupees($ckccOd['outstanding_amount'])) ?></dd></div>
+                        <div><dt>Interest overdue</dt><dd><?= e(rupees($ckccOd['interest_overdue'])) ?></dd></div>
+                        <div><dt>OD limit</dt><dd><?= e(rupees($ckccOd['od_limit'])) ?></dd></div>
+                        <div><dt>OD utilization</dt><dd><?= e(rupees($ckccOd['od_utilization'])) ?></dd></div>
+                        <div><dt>Last credit date</dt><dd><?= $ckccOd['last_credit_date'] === null ? '&mdash;' : fmt_date($ckccOd['last_credit_date']) ?></dd></div>
+                        <div><dt>Eligible for renewal</dt><dd><?= yes_no($ckccOd['eligible_for_renewal']) ?></dd></div>
+                    </dl>
+
+                    <h3 class="lrms-subhead mt-4">Renewal readiness</h3>
+                    <?= $flagBlock(VisitReport::CKCC_OD_ELIGIBILITY_FLAGS, $ckccOd) ?>
+
+                    <h3 class="lrms-subhead mt-4">Renewal consent</h3>
+                    <?= $flagBlock(VisitReport::CKCC_OD_CONSENT_FLAGS, $ckccOd) ?>
+
+                    <?php if (!empty($ckccOd['agent_observation'])): ?>
+                        <h3 class="lrms-subhead mt-4">BC Supervisor observation</h3>
+                        <p class="lrms-prose"><?= nl2br(e($ckccOd['agent_observation'])) ?></p>
+                    <?php endif; ?>
+
+                    <h3 class="lrms-subhead mt-4">Recommendation</h3>
+                    <?= $flagBlock(VisitReport::CKCC_OD_RECOMMENDATION_FLAGS, $ckccOd) ?>
+                    <?php if (!empty($ckccOd['rec_other_text'])): ?>
+                        <p class="text-muted mt-2">Other: <?= e($ckccOd['rec_other_text']) ?></p>
+                    <?php endif; ?>
+
+                    <h3 class="lrms-subhead mt-4">Report status</h3>
+                    <?= $flagBlock(VisitReport::CKCC_OD_STATUS_FLAGS, $ckccOd) ?>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <!-- ================= ADD-ON: CKCC NPA / KRM OTS Field Report =================
+             A dedicated, separate report from the general KRM OTS report above.
+             No Borrower Signature. Only rendered when the agent filed this section. -->
+        <?php if ($npaOts !== null): ?>
+            <div class="lrms-card lrms-card-accent mb-3">
+                <div class="lrms-card-head">
+                    <h2>CKCC NPA - KRM OTS Scheme Field Report</h2>
+                    <?php
+                    $npaStatusTone = [
+                        'approved' => 'badge-visited',
+                        'rejected' => 'badge-legal',
+                        'pending'  => 'badge-pending',
+                    ][$npaOts['approval_status']] ?? 'badge-pending';
+                    ?>
+                    <span class="lrms-badge <?= e($npaStatusTone) ?>">
+                        <?= e(VisitReport::NPA_OTS_APPROVAL_STATUSES[$npaOts['approval_status']] ?? $npaOts['approval_status']) ?>
+                    </span>
+                </div>
+                <div class="lrms-card-body">
+                    <p class="lrms-note">Supervisor: <?= e($report['agent_name']) ?> &middot; BCBF Code: <?= nullable($report['bcbf_code'] ?? $report['bc_code'] ?? null) ?></p>
+
+                    <dl class="lrms-dl">
+                        <div><dt>CIF number</dt><dd><?= nullable($npaOts['cif_number']) ?></dd></div>
+                        <div><dt>Outstanding</dt><dd><?= e(rupees($npaOts['outstanding_amount'])) ?></dd></div>
+                        <div><dt>Interest overdue</dt><dd><?= e(rupees($npaOts['interest_overdue'])) ?></dd></div>
+                        <div>
+                            <dt>NPA date</dt>
+                            <dd><?= empty($npaOts['npa_date']) ? '<span class="text-muted">Not classified</span>' : fmt_date($npaOts['npa_date']) ?></dd>
+                        </div>
+                        <div><dt>Days past due</dt><dd><?= nullable($npaOts['days_past_due']) ?></dd></div>
+                        <div>
+                            <dt>Asset classification</dt>
+                            <dd><?= e(enum_label(VisitReport::ASSET_CLASSIFICATIONS, $npaOts['asset_classification'] ?? null, 'Not recorded')) ?></dd>
+                        </div>
+                        <div><dt>Eligible for KRM OTS</dt><dd><?= yes_no($npaOts['eligible_for_ots']) ?></dd></div>
+                    </dl>
+
+                    <div class="lrms-figures mt-3">
+                        <div class="lrms-figure">
+                            <span class="lrms-figure-label">Borrower&rsquo;s payable
+                                <?php if ($npaOts['payable_percent'] !== null): ?>
+                                    (<?= e(rtrim(rtrim(number_format((float) $npaOts['payable_percent'], 2), '0'), '.')) ?>%)
+                                <?php endif; ?>
+                            </span>
+                            <span class="lrms-figure-value"><?= e(rupees($npaOts['payable_amount'])) ?></span>
+                        </div>
+                        <div class="lrms-figure">
+                            <span class="lrms-figure-label">Total settlement</span>
+                            <span class="lrms-figure-value"><?= e(rupees($npaOts['total_settlement'])) ?></span>
+                        </div>
+                        <div class="lrms-figure">
+                            <span class="lrms-figure-label">Balance payable</span>
+                            <span class="lrms-figure-value"><?= e(rupees($npaOts['balance_payable'])) ?></span>
+                        </div>
+                    </div>
+
+                    <h3 class="lrms-subhead mt-4">Initial deposit</h3>
+                    <p class="lrms-note">
+                        Paid by the borrower at the bank and evidenced by the bank&rsquo;s own
+                        receipt. Agents never collect money.
+                    </p>
+                    <dl class="lrms-dl">
+                        <div><dt>Required deposit</dt><dd><?= e(rupees($npaOts['required_deposit'])) ?></dd></div>
+                        <div><dt>Deposit received</dt><dd><?= yes_no($npaOts['deposit_received']) ?></dd></div>
+                        <div><dt>Deposit amount</dt><dd><?= e(rupees($npaOts['deposit_amount'])) ?></dd></div>
+                        <div><dt>Deposit date</dt><dd><?= $npaOts['deposit_date'] === null ? '&mdash;' : fmt_date($npaOts['deposit_date']) ?></dd></div>
+                        <div><dt>Receipt / transaction ID</dt><dd><?= nullable($npaOts['deposit_reference']) ?></dd></div>
+                        <div><dt>Final payment date</dt><dd><?= $npaOts['final_payment_date'] === null ? '&mdash;' : fmt_date($npaOts['final_payment_date']) ?></dd></div>
+                    </dl>
+
+                    <h3 class="lrms-subhead mt-4">Borrower response</h3>
+                    <dl class="lrms-dl">
+                        <div>
+                            <dt>Response</dt>
+                            <dd><?= e(enum_label(VisitReport::NPA_OTS_BORROWER_RESPONSES, $npaOts['borrower_response'] ?? null, 'Not recorded')) ?></dd>
+                        </div>
+                    </dl>
+                    <?php if (!empty($npaOts['rejection_reason'])): ?>
+                        <div class="lrms-callout lrms-callout-danger mt-3">
+                            <strong>Not accepted:</strong> <?= e($npaOts['rejection_reason']) ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if (!empty($npaOts['observation'])): ?>
+                        <h3 class="lrms-subhead mt-4">BC Supervisor observation</h3>
+                        <p class="lrms-prose"><?= nl2br(e($npaOts['observation'])) ?></p>
+                    <?php endif; ?>
+
+                    <h3 class="lrms-subhead mt-4">Recommendation</h3>
+                    <?= $flagBlock(VisitReport::NPA_OTS_RECOMMENDATION_FLAGS, $npaOts) ?>
+
+                    <h3 class="lrms-subhead mt-4">Final report status</h3>
+                    <?= $flagBlock(VisitReport::NPA_OTS_STATUS_FLAGS, $npaOts) ?>
+                </div>
+            </div>
+        <?php endif; ?>
+
         <!-- Recovery possibility -->
         <div class="lrms-card mb-3">
-            <div class="lrms-card-head"><h2>8. BC agent / DRA observations</h2><p>What the agent found out about payment</p></div>
+            <div class="lrms-card-head"><h2>8. BC Supervisor / DRA observations</h2><p>What the agent found out about payment</p></div>
             <div class="lrms-card-body">
                 <?= $flagBlock(VisitReport::RECOVERY_FLAGS, $report) ?>
 
@@ -721,7 +885,7 @@ $revisionCount = (int) ($report['revision_count'] ?? 0);
                 <p>Signed by hand on the printed copy</p>
             </div>
             <div class="lrms-card-body">
-                <h3 class="lrms-subhead">BC agent / DRA</h3>
+                <h3 class="lrms-subhead">BC Supervisor / DRA</h3>
                 <dl class="lrms-dl">
                     <div><dt>Name</dt><dd><?= e($report['agent_name']) ?></dd></div>
                     <div><dt>BC code / DRA ID</dt><dd><?= nullable($report['bc_code']) ?></dd></div>
@@ -774,7 +938,7 @@ $revisionCount = (int) ($report['revision_count'] ?? 0);
             <div class="lrms-card-body">
                 <p class="text-muted mb-0" style="font-size:.8125rem">
                     Nothing is signed on a screen. <strong>Print this report</strong> &mdash; it
-                    carries empty boxes for the <strong>BC agent&nbsp;/&nbsp;DRA</strong> and the
+                    carries empty boxes for the <strong>BC Supervisor&nbsp;/&nbsp;DRA</strong> and the
                     <strong>supervisor</strong>, to be signed by hand on the paper, which is what
                     section&nbsp;12 of the form asks for.
                 </p>

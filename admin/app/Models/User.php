@@ -292,6 +292,32 @@ final class User
         return (int) Database::instance()->scalar($sql, $params);
     }
 
+    /**
+     * Generates a unique BCBF Code for a newly added staff member.
+     *
+     * Replaces what used to be a free-text field an administrator typed in by
+     * hand: BCBF Code is now assigned by the system the moment a staff account is
+     * created, the same way an employee code is chosen (see UserController::create()).
+     * Sequential and short rather than random, so a printed report shows a code a
+     * branch can actually read out over the phone. Collisions are only possible if
+     * a legacy row already holds the candidate value (e.g. imported data), so the
+     * loop below falls back to a hash suffix rather than looping forever.
+     */
+    public static function generateBcbfCode(): string
+    {
+        $db = Database::instance();
+        $next = (int) $db->scalar('SELECT COUNT(*) FROM users') + 1001;
+
+        for ($i = 0; $i < 1000; $i++) {
+            $candidate = 'BCBF' . str_pad((string) ($next + $i), 6, '0', STR_PAD_LEFT);
+            if ($db->scalar('SELECT 1 FROM users WHERE bcbf_code = ? LIMIT 1', [$candidate]) === null) {
+                return $candidate;
+            }
+        }
+
+        return 'BCBF' . strtoupper(substr(md5(uniqid('', true)), 0, 8));
+    }
+
     /** True when the employee code is free (optionally ignoring one row). */
     public static function employeeCodeAvailable(string $code, ?int $ignoreId = null): bool
     {
