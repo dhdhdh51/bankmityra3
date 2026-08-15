@@ -50,15 +50,15 @@
             </div>
         </div>
 
-        <!-- BC Agent Details -->
+        <!-- BC Supervisor Details -->
         <div class="lrms-card">
             <div class="lrms-card-header">
-                <h5>BC Agent Details</h5>
+                <h5>BC Supervisor Details</h5>
             </div>
             <div class="lrms-card-body">
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <label class="form-label">BC Agent Name</label>
+                        <label class="form-label">BC Supervisor Name</label>
                         <p class="form-value"><?= $visit['bca_name'] ? e((string) $visit['bca_name']) : '—' ?></p>
                     </div>
                     <div class="col-md-6">

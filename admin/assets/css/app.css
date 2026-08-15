@@ -1495,3 +1495,190 @@ a.lrms-stat:active { transform: translateY(0); }
    .navbar-collapse: neither is used here, and a blanket rule for them would be a
    trap for whoever adds the first one. */
 .tab-content > .tab-pane:not(.active) { display: none; }
+
+
+
+/* ==========================================================================
+   ADD-ON: App-wide responsive/dimension pass
+   ==========================================================================
+   Requested separately from every feature above: fixed responsive container
+   widths so nothing overlays on any screen size, sticky-header/bottom-nav
+   clearance, guaranteed horizontal scroll on narrow tables, and print rules
+   that fit an A4 page exactly. Additive only - nothing above is edited or
+   removed, and no rule here overrides a component's own Bootstrap 5 grid
+   classes; it only bounds the shell those classes sit inside.
+   ========================================================================== */
+
+:root {
+    /* The two fixed widths asked for: a mobile app screen never exceeds 420px
+       of usable width, and a desktop panel never stretches past 1200px no
+       matter how wide the monitor is. Kept as tokens so any component can
+       reference them instead of a magic number recurring across files. */
+    --lrms-mobile-max-w: 420px;
+    --lrms-desktop-max-w: 1200px;
+    /* Space reserved for a bottom navigation bar on small screens. 0 by
+       default - there is no bottom nav in this panel today - so this costs
+       nothing until one exists, and a future one only has to set this
+       variable rather than patch every page that scrolls under it. */
+    --lrms-bottom-nav-h: 0px;
+}
+
+/* --------------------------------------------------------------------------
+   Desktop: bound the content column at 1200px
+   --------------------------------------------------------------------------
+   .lrms-content already gets side padding from the base rules above; this
+   only adds a max-width and centers it once the viewport is wide enough that
+   an unbounded table or form would otherwise run edge-to-edge on a large
+   monitor, which is what produced the "overlay" reports on desktop - a
+   1900px-wide filter bar sitting one line taller than the table it filtered.
+   -------------------------------------------------------------------------- */
+@media (min-width: 992px) {
+    .lrms-content {
+        max-width: var(--lrms-desktop-max-w);
+        margin-left: auto;
+        margin-right: auto;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   Mobile: bound the content column at 420px
+   --------------------------------------------------------------------------
+   Below the sidebar's own collapse breakpoint, treat the panel as a mobile
+   app screen: content never grows wider than 420px, centered, with room at
+   the edges so a card's border is never flush with the glass. This is what
+   stops a wide Bootstrap row (built for a desktop form) from forcing
+   horizontal scroll on the page itself on a small phone - only tables should
+   ever scroll sideways, never the page.
+   -------------------------------------------------------------------------- */
+@media (max-width: 575.98px) {
+    .lrms-content {
+        max-width: var(--lrms-mobile-max-w);
+        margin-left: auto;
+        margin-right: auto;
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+
+    /* Buttons and form actions go full-width on a phone rather than wrapping
+       into an uneven row - a half-width "Save" button next to empty space
+       reads as a broken layout, not a considered one. */
+    .lrms-page-head { flex-direction: column; align-items: stretch; }
+    .lrms-page-head .btn { width: 100%; justify-content: center; }
+}
+
+/* --------------------------------------------------------------------------
+   Sticky header / bottom-nav clearance
+   --------------------------------------------------------------------------
+   .lrms-topbar is position:sticky at the base rules above, which keeps it
+   correctly out of the document flow already - but a page whose first
+   element sits flush against the content edge still visually touches the
+   bar's hairline border on the very first scroll frame. This pads the
+   content area by the topbar's own height variable (already defined) plus a
+   fixed bottom-nav reservation, so neither a sticky header nor a future
+   bottom navigation bar can cover the first or last thing on the page.
+   -------------------------------------------------------------------------- */
+.lrms-content {
+    padding-bottom: calc(20px + var(--lrms-bottom-nav-h));
+}
+@media (max-width: 991.98px) {
+    .lrms-content {
+        padding-bottom: calc(16px + var(--lrms-bottom-nav-h) + env(safe-area-inset-bottom, 0px));
+    }
+}
+
+/* If a bottom navigation bar is ever added, this class fixes it to the
+   viewport's bottom edge and keeps it above the sidebar backdrop but below a
+   modal - and setting --lrms-bottom-nav-h to its real height (via inline
+   style or a modifier class) automatically pushes .lrms-content clear of it,
+   rather than requiring every page template to know it exists. */
+.lrms-bottom-nav {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 1035;
+    background: var(--lrms-surface);
+    border-top: 1px solid var(--lrms-border);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* --------------------------------------------------------------------------
+   Tables: guaranteed horizontal scroll on small screens
+   --------------------------------------------------------------------------
+   .lrms-table-wrap already sets overflow-x: auto (base rules above) and every
+   .lrms-table across the app is already wrapped in it. This reinforces that
+   contract on narrow viewports specifically - a minimum content width on the
+   table itself, so a table with only three columns does not shrink each one
+   unreadably instead of scrolling - and pulls the scroll region visually to
+   the page edge so there is room to actually swipe it on a phone.
+   -------------------------------------------------------------------------- */
+@media (max-width: 767.98px) {
+    .lrms-table-wrap {
+        margin-left: -14px;
+        margin-right: -14px;
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+    .lrms-table { min-width: 640px; }
+}
+
+/* --------------------------------------------------------------------------
+   Forms and cards: consistent spacing at every width
+   --------------------------------------------------------------------------
+   The base .lrms-fieldset/.row grid is pure Bootstrap 5 (col-md-*, col-lg-*)
+   and is left entirely alone - only the density of what surrounds it changes
+   with viewport width, so nothing ever touches its neighbour.
+   -------------------------------------------------------------------------- */
+@media (max-width: 575.98px) {
+    .lrms-card-body { padding: 14px; }
+    .lrms-filters { grid-template-columns: 1fr; }
+    .lrms-check-grid { grid-template-columns: 1fr; }
+    .lrms-figures { grid-template-columns: 1fr; }
+}
+@media (min-width: 576px) and (max-width: 991.98px) {
+    .lrms-card-body { padding: 16px; }
+}
+
+/* --------------------------------------------------------------------------
+   Print: A4-perfect, no clipping, no overlapping
+   --------------------------------------------------------------------------
+   The base @media print block (above) already hides chrome and sets an A4
+   @page. This adds the pieces specific to the two new dedicated reports and
+   guarantees nothing on a printed page runs past the sheet: fixed pixel
+   widths that make sense on a screen (max-width tokens, table min-widths)
+   are all released for print, since a printed page has its own fixed
+   dimension already - the paper - and inheriting a screen width would either
+   clip a wide table or leave the page mostly blank.
+   -------------------------------------------------------------------------- */
+@media print {
+    html, body { width: 210mm; }
+
+    /* Release every screen-only width constraint added above - print has one
+       true width, the page, not a mobile or desktop breakpoint. */
+    .lrms-content,
+    .lrms-table-wrap {
+        max-width: none !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+    .lrms-table { min-width: 0 !important; width: 100% !important; }
+
+    /* A bottom nav (if one is ever added) is chrome, not content, and has no
+       place on a printed page. */
+    .lrms-bottom-nav { display: none !important; }
+
+    /* Long dl/dt/dd blocks (used throughout the CKCC OD / NPA-KRM-OTS report
+       cards) must not split a label from its value across a page break - that
+       is what "clipping" looks like on this kind of document. */
+    .lrms-dl > div,
+    .lrms-figure,
+    .lrms-check-tile {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    /* Force one column of key figures on print regardless of how many fit on
+       screen, so a figure block never straddles the fold between two print
+       columns that only existed on a wide monitor. */
+    .lrms-figures { grid-template-columns: 1fr 1fr !important; }
+}

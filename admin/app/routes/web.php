@@ -66,6 +66,11 @@ return static function (Router $router): void {
     $router->get('/visits', [VisitController::class, 'index']);
     $router->get('/visits/{id}', [VisitController::class, 'show']);
     $router->get('/visits/{id}/pdf', [VisitController::class, 'pdf']);
+    // ADD-ON: dedicated printable exports for the two new field report types.
+    // Registered alongside /pdf, before /approve and /revise, for the same
+    // literal-segment-before-{id} reason.
+    $router->get('/visits/{id}/pdf-ckcc-od', [VisitController::class, 'pdfCkccOd']);
+    $router->get('/visits/{id}/pdf-npa-ots', [VisitController::class, 'pdfNpaOts']);
     // Approval and correction. Registered after /pdf so a literal segment is never
     // read as an id.
     $router->form('/visits/{id}/approve', [VisitController::class, 'approve']);

@@ -70,7 +70,7 @@ final class NotificationController extends Controller
                 'branches' => Branch::options($scoped),
                 'roles'    => [
                     ''               => 'Everyone',
-                    'agent'          => 'BC Agents only',
+                    'agent'          => 'BC Supervisors only',
                     'branch_manager' => 'Branch Managers only',
                 ],
             ]);

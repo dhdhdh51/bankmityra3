@@ -1,6 +1,6 @@
 <?php
 /**
- * BC Supervisor Visit Form - with auto-population of BC Agent details
+ * BC Supervisor Visit Form - with auto-population of BC Supervisor details
  *
  * @var array<string,mixed>|null   $visit   null when creating
  * @var list<array<string,mixed>>  $agents
@@ -73,20 +73,20 @@ $checked = static function (string $key, mixed $expected = 1) use ($old, $visit)
                 </div>
             </div>
 
-            <!-- BC Agent Selection - Only on Create -->
+            <!-- BC Supervisor Selection - Only on Create -->
             <?php if (!$isEdit): ?>
             <div class="lrms-card">
                 <div class="lrms-card-header">
-                    <h5>Select BC Agent to Visit</h5>
+                    <h5>Select BC Supervisor to Visit</h5>
                 </div>
                 <div class="lrms-card-body">
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label" for="user_id">BC Agent <span class="req">*</span></label>
+                            <label class="form-label" for="user_id">BC Supervisor <span class="req">*</span></label>
                             <?php $selectedAgent = $value('user_id'); ?>
                             <select class="form-select<?= has_error($errors, 'user_id') ?>"
                                     id="user_id" name="user_id" required>
-                                <option value="">Select a BC Agent to visit&hellip;</option>
+                                <option value="">Select a BC Supervisor to visit&hellip;</option>
                                 <?php foreach ($agents as $agent): ?>
                                     <option value="<?= (int) $agent['id'] ?>"
                                         <?= $selectedAgent === (string) $agent['id'] ? 'selected' : '' ?>>
@@ -106,15 +106,15 @@ $checked = static function (string $key, mixed $expected = 1) use ($old, $visit)
             </div>
             <?php endif; ?>
 
-            <!-- Auto-populated BC Agent Details (Read-only) -->
+            <!-- Auto-populated BC Supervisor Details (Read-only) -->
             <div class="lrms-card">
                 <div class="lrms-card-header">
-                    <h5>BC Agent Details (Auto-populated)</h5>
+                    <h5>BC Supervisor Details (Auto-populated)</h5>
                 </div>
                 <div class="lrms-card-body">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label" for="bca_name">BC Agent Name</label>
+                            <label class="form-label" for="bca_name">BC Supervisor Name</label>
                             <input type="text" class="form-control" id="bca_name" name="bca_name"
                                    value="<?= $value('bca_name') ?>" readonly>
                         </div>
@@ -223,7 +223,7 @@ $checked = static function (string $key, mixed $expected = 1) use ($old, $visit)
                             <label class="form-label" for="feedback">Feedback</label>
                             <textarea class="form-control<?= has_error($errors, 'feedback') ?>"
                                       id="feedback" name="feedback"
-                                      rows="3" maxlength="1000" placeholder="Feedback on BC Agent performance"><?= $value('feedback') ?></textarea>
+                                      rows="3" maxlength="1000" placeholder="Feedback on BC Supervisor performance"><?= $value('feedback') ?></textarea>
                             <?= field_error($errors, 'feedback') ?>
                         </div>
 

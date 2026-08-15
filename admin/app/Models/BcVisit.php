@@ -10,7 +10,7 @@ use App\Core\Paginator;
 /**
  * BC Supervisor visit reports.
  *
- * Supervisors visit BC Agents to assess their performance, equipment, documentation,
+ * Supervisors visit BC Supervisors to assess their performance, equipment, documentation,
  * and remuneration. Each visit captures agent details (auto-populated from the user record)
  * and supervisor observations and feedback.
  */

@@ -53,8 +53,15 @@ final class VisitService
      * 'pre_npa' and 'post_npa' are ordinary doorstep verification, not settlement or
      * renewal work - and before they existed here they were filed as plain recovery
      * calls, which made the pre-NPA worklist unbuildable from the reports themselves.
+     *
+     * 'ckcc_od' and 'ckcc_npa_ots' are two later, separate additions - a dedicated CKCC
+     * OD field report and a dedicated NPA-under-KRM-OTS field report. Both are ADD-ONs:
+     * neither changes what 'ckcc_renewal' or 'ots' store or how they render.
      */
-    public const REPORT_TYPES = ['recovery', 'ots', 'ckcc_renewal', 'pre_npa', 'post_npa', 'other'];
+    public const REPORT_TYPES = [
+        'recovery', 'ots', 'ckcc_renewal', 'pre_npa', 'post_npa', 'other',
+        'ckcc_od', 'ckcc_npa_ots',
+    ];
 
     /**
      * @param array<string,mixed> $input Validated form/API payload.
@@ -162,6 +169,10 @@ final class VisitService
                 'visit_date'  => $visitDate,
                 'visit_time'  => $visitTime,
                 'bc_code'     => $agent['bc_code'] ?? $lead['bc_code'] ?? null,
+                // The app sends its own bcbf_code field when the agent has one on
+                // their profile; falls back to the user record when the app did not
+                // send it, so an older APK still produces a report with the code on it.
+                'bcbf_code'   => self::str($input['bcbf_code'] ?? $agent['bcbf_code'] ?? null, 40),
                 'agent_name'  => (string) $agent['name'],
                 'branch_name' => (string) ($lead['branch_name'] ?? ''),
                 'village'     => self::str($input['village'] ?? $customer['village'], 150),
@@ -307,7 +318,7 @@ final class VisitService
                 'ev_others'         => self::flag($input['ev_others'] ?? null),
                 'ev_other_text'     => self::str($input['ev_other_text'] ?? null, 255),
 
-                // ---- 8. BC agent / DRA observations -----------------------
+                // ---- 8. BC Supervisor / DRA observations -----------------------
                 'remarks'     => self::text($input['remarks'] ?? null),
 
                 // ---- 11. Declaration --------------------------------------
@@ -335,6 +346,8 @@ final class VisitService
             // ---- 1b. report-type detail sections -------------------------
             self::insertOtsDetails($visitId, $loanAccountId, $lead, $input);
             self::insertCkccDetails($visitId, $loanAccountId, $lead, $input);
+            self::insertCkccOdDetails($visitId, $loanAccountId, $lead, $input);
+            self::insertNpaOtsDetails($visitId, $loanAccountId, $lead, $input);
 
             // ---- 2. timeline event --------------------------------------
             Timeline::record(
@@ -1044,6 +1057,155 @@ final class VisitService
             'st_pending_at_branch'     => self::flag($section['st_pending_at_branch'] ?? null),
             'st_followup_required'     => self::flag($section['st_followup_required'] ?? null),
             'st_became_npa'            => self::flag($section['st_became_npa'] ?? null),
+        ]);
+    }
+
+    /**
+     * CKCC OD Field Report section (report_type = 'ckcc_od').
+     *
+     * ADD-ON, entirely separate from insertCkccDetails() above: this reads its own
+     * `ckcc_od_details` section of the payload and writes its own table. It never
+     * touches visit_ckcc_details or anything insertCkccDetails() does.
+     *
+     * Unlike the CKCC OD-2 renewal section, this one has no renewal_due_date /
+     * expected_npa_date / days_remaining - a CKCC OD field visit is not built around
+     * a renewal deadline - and it asks three OD-specific figures instead
+     * (od_limit, od_utilization, last_credit_date).
+     *
+     * @param array<string,mixed> $lead
+     * @param array<string,mixed> $input
+     */
+    private static function insertCkccOdDetails(int $visitId, int $loanAccountId, array $lead, array $input): void
+    {
+        $section = self::section($input, 'ckcc_od_details');
+        if ($section === null) {
+            return;
+        }
+
+        Database::instance()->insert('visit_ckcc_od_details', [
+            'visit_report_id' => $visitId,
+            'loan_account_id' => $loanAccountId,
+
+            'cif_number'         => self::str($section['cif_number'] ?? $lead['cif_number'] ?? null, 40),
+            'sanction_date'      => self::nullableDate($section['sanction_date'] ?? $lead['sanction_date'] ?? null),
+            'sanction_limit'     => self::nullableAmount($section['sanction_limit'] ?? $lead['sanction_limit'] ?? null),
+            'drawing_power'      => self::nullableAmount($section['drawing_power'] ?? $lead['drawing_power'] ?? null),
+            'outstanding_amount' => self::nullableAmount($section['outstanding_amount'] ?? $lead['outstanding_amount']),
+            'interest_overdue'   => self::nullableAmount($section['interest_overdue'] ?? $lead['interest_overdue'] ?? null),
+
+            'od_limit'         => self::nullableAmount($section['od_limit'] ?? null),
+            'od_utilization'   => self::nullableAmount($section['od_utilization'] ?? null),
+            'last_credit_date' => self::nullableDate($section['last_credit_date'] ?? null),
+
+            'eligible_for_renewal'   => self::flag($section['eligible_for_renewal'] ?? null),
+            'kyc_status'             => self::enum($section['kyc_status'] ?? null, ['complete', 'pending']),
+            'aadhaar_seeded'         => self::flag($section['aadhaar_seeded'] ?? null),
+            'mobile_linked'          => self::flag($section['mobile_linked'] ?? null),
+            'aadhaar_auth_completed' => self::flag($section['aadhaar_auth_completed'] ?? null),
+
+            'willing_to_renew'      => self::flag($section['willing_to_renew'] ?? null),
+            'documents_handed_over' => self::flag($section['documents_handed_over'] ?? null),
+            'renewal_form_signed'   => self::flag($section['renewal_form_signed'] ?? null),
+            'ekyc_completed'        => self::flag($section['ekyc_completed'] ?? null),
+            'biometrics_completed'  => self::flag($section['biometrics_completed'] ?? null),
+
+            'agent_observation'         => self::text($section['agent_observation'] ?? null),
+            'rec_renew_immediately'     => self::flag($section['rec_renew_immediately'] ?? null),
+            'rec_documents_submitted'   => self::flag($section['rec_documents_submitted'] ?? null),
+            'rec_pending_documents'     => self::flag($section['rec_pending_documents'] ?? null),
+            'rec_followup_required'     => self::flag($section['rec_followup_required'] ?? null),
+            'rec_not_interested'        => self::flag($section['rec_not_interested'] ?? null),
+            'rec_branch_contact_urgent' => self::flag($section['rec_branch_contact_urgent'] ?? null),
+            'rec_others'                => self::flag($section['rec_others'] ?? null),
+            'rec_other_text'            => self::str($section['rec_other_text'] ?? null, 255),
+
+            'st_customer_contacted'    => self::flag($section['st_customer_contacted'] ?? null),
+            'st_customer_verified'     => self::flag($section['st_customer_verified'] ?? null),
+            'st_documents_collected'   => self::flag($section['st_documents_collected'] ?? null),
+            'st_application_submitted' => self::flag($section['st_application_submitted'] ?? null),
+            'st_renewed'               => self::flag($section['st_renewed'] ?? null),
+            'st_pending_at_branch'     => self::flag($section['st_pending_at_branch'] ?? null),
+            'st_followup_required'     => self::flag($section['st_followup_required'] ?? null),
+            'st_became_npa'            => self::flag($section['st_became_npa'] ?? null),
+        ]);
+    }
+
+    /**
+     * CKCC NPA Accounts under KRM OTS Scheme Field Report section
+     * (report_type = 'ckcc_npa_ots').
+     *
+     * ADD-ON, entirely separate from insertOtsDetails() above: reads its own
+     * `npa_ots_details` section and writes its own table. The general 'ots' case
+     * type and visit_ots_details are untouched by this method.
+     *
+     * @param array<string,mixed> $lead
+     * @param array<string,mixed> $input
+     */
+    private static function insertNpaOtsDetails(int $visitId, int $loanAccountId, array $lead, array $input): void
+    {
+        $section = self::section($input, 'npa_ots_details');
+        if ($section === null) {
+            return;
+        }
+
+        Database::instance()->insert('visit_npa_ots_details', [
+            'visit_report_id' => $visitId,
+            'loan_account_id' => $loanAccountId,
+
+            'cif_number'         => self::str($section['cif_number'] ?? $lead['cif_number'] ?? null, 40),
+            'sanction_date'      => self::nullableDate($section['sanction_date'] ?? $lead['sanction_date'] ?? null),
+            'sanction_limit'     => self::nullableAmount($section['sanction_limit'] ?? $lead['sanction_limit'] ?? null),
+            'drawing_power'      => self::nullableAmount($section['drawing_power'] ?? $lead['drawing_power'] ?? null),
+            'outstanding_amount' => self::nullableAmount($section['outstanding_amount'] ?? $lead['outstanding_amount']),
+            'interest_overdue'   => self::nullableAmount($section['interest_overdue'] ?? $lead['interest_overdue'] ?? null),
+            // Bank data, taken from the account when the form did not send its own -
+            // an agent should not have to retype the very NPA date the settlement is
+            // being offered against.
+            'npa_date'             => self::nullableDate($section['npa_date'] ?? $lead['npa_date'] ?? null),
+            'days_past_due'        => is_numeric($section['days_past_due'] ?? null) ? (int) $section['days_past_due'] : null,
+            'asset_classification' => self::assetClassification($section['asset_classification'] ?? $lead['asset_classification'] ?? null),
+
+            'eligible_for_ots'  => self::flag($section['eligible_for_ots'] ?? null),
+            'scheme'            => self::enum($section['scheme'] ?? null, ['krm_ots', 'general_ots', 'other']),
+            'scheme_other_text' => self::str($section['scheme_other_text'] ?? null, 150),
+            'relief_percent'    => self::percent($section['relief_percent'] ?? null),
+            'rlb_amount'        => self::nullableAmount($section['rlb_amount'] ?? $lead['outstanding_amount']),
+            'payable_percent'   => self::percent($section['payable_percent'] ?? null),
+            'payable_amount'    => self::nullableAmount($section['payable_amount'] ?? null),
+            'total_settlement'  => self::nullableAmount($section['total_settlement'] ?? null),
+
+            'deposit_percent'    => self::percent($section['deposit_percent'] ?? null),
+            'required_deposit'   => self::nullableAmount($section['required_deposit'] ?? null),
+            'deposit_received'   => self::flag($section['deposit_received'] ?? null),
+            'deposit_amount'     => self::nullableAmount($section['deposit_amount'] ?? null),
+            'deposit_date'       => self::nullableDate($section['deposit_date'] ?? null),
+            'deposit_reference'  => self::str($section['deposit_reference'] ?? null, 120),
+            'balance_payable'    => self::nullableAmount($section['balance_payable'] ?? null),
+            'final_payment_date' => self::nullableDate($section['final_payment_date'] ?? null),
+
+            'approval_status'       => self::enum($section['approval_status'] ?? null, ['pending', 'approved', 'rejected']) ?? 'pending',
+            'validity_from'         => self::nullableDate($section['validity_from'] ?? null),
+            'validity_to'           => self::nullableDate($section['validity_to'] ?? null),
+            'expected_closure_date' => self::nullableDate($section['expected_closure_date'] ?? null),
+
+            'borrower_response' => self::enum($section['borrower_response'] ?? null, [
+                'accepted', 'requested_time', 'financial_difficulty', 'refused', 'not_available',
+            ]),
+            'rejection_reason'  => self::str($section['rejection_reason'] ?? null, 500),
+
+            'observation'               => self::text($section['observation'] ?? null),
+            'rec_proposal_recommended'  => self::flag($section['rec_proposal_recommended'] ?? null),
+            'rec_followup_required'     => self::flag($section['rec_followup_required'] ?? null),
+            'rec_customer_refused'      => self::flag($section['rec_customer_refused'] ?? null),
+            'rec_not_eligible'          => self::flag($section['rec_not_eligible'] ?? null),
+
+            'st_customer_contacted'       => self::flag($section['st_customer_contacted'] ?? null),
+            'st_customer_verified'        => self::flag($section['st_customer_verified'] ?? null),
+            'st_ots_accepted'             => self::flag($section['st_ots_accepted'] ?? null),
+            'st_ots_rejected'             => self::flag($section['st_ots_rejected'] ?? null),
+            'st_initial_deposit_received' => self::flag($section['st_initial_deposit_received'] ?? null),
+            'st_ots_closed'               => self::flag($section['st_ots_closed'] ?? null),
+            'st_followup_required'        => self::flag($section['st_followup_required'] ?? null),
         ]);
     }
 

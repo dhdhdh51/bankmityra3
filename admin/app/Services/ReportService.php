@@ -82,6 +82,18 @@ final class ReportService
             'label'       => 'OD-2 Renewal Worklist',
             'description' => 'OD-2 accounts by renewal due date, soonest first',
         ],
+        // ADD-ONs: two dedicated report types, listing filed visit reports of the two
+        // new field-report case types. Entirely separate from every report above -
+        // they never read visit_ots_details or visit_ckcc_details, and adding them
+        // does not change how the CKCC OD-2 renewal or KRM OTS report is built.
+        'ckcc-od' => [
+            'label'       => 'CKCC OD Field Report',
+            'description' => 'CKCC OD case field verification reports, with supervisor and BCBF code',
+        ],
+        'ckcc-npa-krm' => [
+            'label'       => 'CKCC NPA / KRM OTS Field Report',
+            'description' => 'NPA accounts field-verified under the KRM OTS scheme',
+        ],
     ];
 
     public static function isValidType(string $type): bool
@@ -119,6 +131,10 @@ final class ReportService
             // they contain, and duplicating the query would let them drift apart.
             'kcc-renewal' => self::renewalWorklist($filters, 'kcc'),
             'od2-renewal' => self::renewalWorklist($filters, 'od2'),
+            // ADD-ONs, one method per report type: filed reports of the matching
+            // report_type, not a shared query with either worklist above.
+            'ckcc-od'      => self::ckccOdFieldReports($filters),
+            'ckcc-npa-krm' => self::npaOtsFieldReports($filters),
             default     => throw new \InvalidArgumentException('Unknown report type: ' . $type),
         };
     }
@@ -1523,6 +1539,175 @@ final class ReportService
             ],
             'landscape' => true,
             'filename' => self::filename($facility === 'kcc' ? 'kcc-renewal' : 'od2-renewal'),
+        ];
+    }
+
+    // =======================================================================
+    // ADD-ON: CKCC OD Field Report  (report_type = 'ckcc_od')
+    // =======================================================================
+
+    /**
+     * Filed CKCC OD Field Reports, newest first.
+     *
+     * Entirely separate from renewalWorklist() above: this lists visit reports
+     * that were actually filed with report_type = 'ckcc_od', not loan accounts due
+     * for renewal. Nothing here reads visit_ckcc_details or visit_ots_details.
+     *
+     * @param array<string,mixed> $filters
+     * @return array<string,mixed>
+     */
+    private static function ckccOdFieldReports(array $filters): array
+    {
+        [$scope, $params] = self::scope($filters, 'vr');
+
+        $rows = Database::instance()->all(
+            "SELECT vr.id,
+                    vr.loan_account_number,
+                    vr.customer_name,
+                    vr.village,
+                    vr.agent_name,
+                    COALESCE(vr.bcbf_code, vr.bc_code, '') AS bcbf_code,
+                    vr.visit_date,
+                    d.outstanding_amount,
+                    d.od_limit,
+                    d.od_utilization,
+                    d.eligible_for_renewal,
+                    d.kyc_status,
+                    d.st_renewed,
+                    d.st_became_npa
+               FROM visit_reports vr
+               JOIN visit_ckcc_od_details d ON d.visit_report_id = vr.id
+              WHERE vr.report_type = 'ckcc_od'
+                {$scope}
+              ORDER BY vr.visit_date DESC, vr.id DESC",
+            $params
+        );
+
+        $columns = [
+            ['key' => 'id',                  'label' => 'Report #',      'type' => 'number', 'width' => 0.8],
+            ['key' => 'loan_account_number',  'label' => 'Loan Account',  'type' => 'text',   'width' => 1.5],
+            ['key' => 'customer_name',        'label' => 'Borrower',      'type' => 'text',   'width' => 1.6],
+            ['key' => 'village',              'label' => 'Village',       'type' => 'text',   'width' => 1.1],
+            ['key' => 'agent_name',           'label' => 'BC Supervisor', 'type' => 'text',   'width' => 1.4],
+            ['key' => 'bcbf_code',            'label' => 'BCBF Code',     'type' => 'text',   'width' => 1.0],
+            ['key' => 'visit_date',           'label' => 'Visit Date',    'type' => 'date',   'width' => 1.0],
+            ['key' => 'outstanding_amount',   'label' => 'Outstanding',   'type' => 'money',  'width' => 1.2],
+            ['key' => 'od_limit',             'label' => 'OD Limit',      'type' => 'money',  'width' => 1.1],
+            ['key' => 'od_utilization',       'label' => 'OD Utilization', 'type' => 'money', 'width' => 1.2],
+            ['key' => 'kyc_status',           'label' => 'KYC Status',    'type' => 'text',   'width' => 1.0],
+        ];
+
+        $rows = self::castRows($rows, $columns);
+        $totals = self::sumTotals($rows, array_values(array_filter(
+            $columns,
+            static fn (array $column): bool => $column['type'] === 'money'
+        )), 'loan_account_number', 'TOTAL');
+        if ($totals !== null) {
+            $totals['customer_name'] = '';
+            $totals['village'] = '';
+            $totals['agent_name'] = '';
+            $totals['bcbf_code'] = '';
+            $totals['visit_date'] = null;
+            $totals['kyc_status'] = sprintf('%d report(s)', count($rows));
+        }
+
+        return [
+            'type'      => 'ckcc-od',
+            'title'     => 'CKCC OD Field Report',
+            'subtitle'  => self::subtitle($filters, sprintf('%d report(s) filed', count($rows))),
+            'columns'   => $columns,
+            'rows'      => $rows,
+            'totals'    => $totals,
+            'summary'   => [
+                ['label' => 'Reports filed',     'value' => (string) count($rows)],
+                ['label' => 'Report type',       'value' => 'CKCC OD Field Report'],
+            ],
+            'landscape' => true,
+            'filename'  => self::filename('ckcc-od'),
+        ];
+    }
+
+    // =======================================================================
+    // ADD-ON: CKCC NPA Accounts under KRM OTS Scheme Field Report
+    // (report_type = 'ckcc_npa_ots')
+    // =======================================================================
+
+    /**
+     * Filed CKCC NPA / KRM OTS Field Reports, newest first.
+     *
+     * Entirely separate from the general KRM OTS report: this lists visit reports
+     * with report_type = 'ckcc_npa_ots' only. Nothing here reads visit_ots_details.
+     *
+     * @param array<string,mixed> $filters
+     * @return array<string,mixed>
+     */
+    private static function npaOtsFieldReports(array $filters): array
+    {
+        [$scope, $params] = self::scope($filters, 'vr');
+
+        $rows = Database::instance()->all(
+            "SELECT vr.id,
+                    vr.loan_account_number,
+                    vr.customer_name,
+                    vr.village,
+                    vr.agent_name,
+                    COALESCE(vr.bcbf_code, vr.bc_code, '') AS bcbf_code,
+                    vr.visit_date,
+                    d.outstanding_amount,
+                    d.total_settlement,
+                    d.payable_amount,
+                    d.deposit_received,
+                    d.approval_status,
+                    d.asset_classification
+               FROM visit_reports vr
+               JOIN visit_npa_ots_details d ON d.visit_report_id = vr.id
+              WHERE vr.report_type = 'ckcc_npa_ots'
+                {$scope}
+              ORDER BY vr.visit_date DESC, vr.id DESC",
+            $params
+        );
+
+        $columns = [
+            ['key' => 'id',                  'label' => 'Report #',       'type' => 'number', 'width' => 0.8],
+            ['key' => 'loan_account_number',  'label' => 'Loan Account',   'type' => 'text',   'width' => 1.5],
+            ['key' => 'customer_name',        'label' => 'Borrower',       'type' => 'text',   'width' => 1.6],
+            ['key' => 'village',              'label' => 'Village',        'type' => 'text',  'width' => 1.1],
+            ['key' => 'agent_name',           'label' => 'BC Supervisor',  'type' => 'text',   'width' => 1.4],
+            ['key' => 'bcbf_code',            'label' => 'BCBF Code',      'type' => 'text',   'width' => 1.0],
+            ['key' => 'visit_date',           'label' => 'Visit Date',     'type' => 'date',   'width' => 1.0],
+            ['key' => 'outstanding_amount',   'label' => 'Outstanding',    'type' => 'money',  'width' => 1.2],
+            ['key' => 'total_settlement',     'label' => 'Settlement',     'type' => 'money',  'width' => 1.2],
+            ['key' => 'payable_amount',       'label' => "Borrower's Share", 'type' => 'money', 'width' => 1.3],
+            ['key' => 'approval_status',      'label' => 'Approval Status', 'type' => 'text',  'width' => 1.1],
+        ];
+
+        $rows = self::castRows($rows, $columns);
+        $totals = self::sumTotals($rows, array_values(array_filter(
+            $columns,
+            static fn (array $column): bool => $column['type'] === 'money'
+        )), 'loan_account_number', 'TOTAL');
+        if ($totals !== null) {
+            $totals['customer_name'] = '';
+            $totals['village'] = '';
+            $totals['agent_name'] = '';
+            $totals['bcbf_code'] = '';
+            $totals['visit_date'] = null;
+            $totals['approval_status'] = sprintf('%d report(s)', count($rows));
+        }
+
+        return [
+            'type'      => 'ckcc-npa-krm',
+            'title'     => 'CKCC NPA / KRM OTS Field Report',
+            'subtitle'  => self::subtitle($filters, sprintf('%d report(s) filed', count($rows))),
+            'columns'   => $columns,
+            'rows'      => $rows,
+            'totals'    => $totals,
+            'summary'   => [
+                ['label' => 'Reports filed', 'value' => (string) count($rows)],
+                ['label' => 'Report type',   'value' => 'CKCC NPA / KRM OTS Field Report'],
+            ],
+            'landscape' => true,
+            'filename'  => self::filename('ckcc-npa-krm'),
         ];
     }
 }

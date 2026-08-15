@@ -250,7 +250,7 @@ final class ImportService
                                 $errors[] = [
                                     'row'     => $lineNumber,
                                     'account' => $account,
-                                    'message' => 'Imported without assignment: this branch has no active BC agent.',
+                                    'message' => 'Imported without assignment: this branch has no active BC Supervisor.',
                                 ];
                             } else {
                                 $workloadByBranch[$branchId][$agentForRow]['open']++;

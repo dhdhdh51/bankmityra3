@@ -153,6 +153,10 @@ final class VisitReport
     public const REPORT_TYPES = [
         'ots'           => 'KRM OTS',
         'ckcc_renewal'  => 'CKCC OD-2 Renewal',
+        // ADD-ONs: dedicated field reports, distinct case types from the two above.
+        // Neither changes what 'ots' or 'ckcc_renewal' store or how they render.
+        'ckcc_od'       => 'CKCC OD Field Report',
+        'ckcc_npa_ots'  => 'CKCC NPA - KRM OTS Scheme',
         'recovery'      => 'Recovery Follow-up',
         'pre_npa'       => 'Pre-NPA Verification',
         'post_npa'      => 'Post-NPA Verification',
@@ -267,6 +271,101 @@ final class VisitReport
         'st_followup_required'     => 'Follow-up Required',
     ];
 
+    // -----------------------------------------------------------------------
+    // CKCC OD Field Report  (report_type = 'ckcc_od')
+    //
+    // ADD-ON: a dedicated, separate report from CKCC OD-2 Renewal above. Same
+    // shape, minus the renewal-deadline fields, plus the OD-specific ones (OD
+    // Limit, OD Utilization, Last Credit Date). None of the CKCC_* consts above
+    // are reused or renamed - these are new, parallel names.
+    // -----------------------------------------------------------------------
+
+    public const CKCC_OD_KYC_STATUSES = [
+        'complete' => 'Complete',
+        'pending'  => 'Pending',
+    ];
+
+    public const CKCC_OD_ELIGIBILITY_FLAGS = [
+        'eligible_for_renewal'   => 'Eligible for Renewal',
+        'aadhaar_seeded'         => 'Aadhaar Seeded',
+        'mobile_linked'          => 'Mobile Linked',
+        'aadhaar_auth_completed' => 'Aadhaar Authentication Completed',
+    ];
+
+    public const CKCC_OD_CONSENT_FLAGS = [
+        'willing_to_renew'      => 'Borrower Willing to Renew',
+        'documents_handed_over' => 'Documents Handed Over',
+        'renewal_form_signed'   => 'Renewal Form Signed',
+        'ekyc_completed'        => 'Aadhaar e-KYC Completed',
+        'biometrics_completed'  => 'Biometrics Completed',
+    ];
+
+    public const CKCC_OD_RECOMMENDATION_FLAGS = [
+        'rec_renew_immediately'     => 'Renewal Immediately Recommended',
+        'rec_documents_submitted'   => 'Documents Complete',
+        'rec_pending_documents'     => 'Pending Documents',
+        'rec_not_interested'        => 'Customer Not Interested',
+        'rec_branch_contact_urgent' => 'Branch Follow-up Required',
+        'rec_followup_required'     => 'Follow-up Required',
+        'rec_others'                => 'Other',
+    ];
+
+    public const CKCC_OD_STATUS_FLAGS = [
+        'st_customer_contacted'    => 'Customer Contacted',
+        'st_customer_verified'     => 'Customer Verified',
+        'st_documents_collected'   => 'Documents Collected',
+        'st_application_submitted' => 'Application Submitted',
+        'st_renewed'               => 'Renewed',
+        'st_pending_at_branch'     => 'Pending at Branch',
+        'st_became_npa'            => 'Account Became NPA',
+        'st_followup_required'     => 'Follow-up Required',
+    ];
+
+    // -----------------------------------------------------------------------
+    // CKCC NPA Accounts under KRM OTS Scheme Field Report
+    // (report_type = 'ckcc_npa_ots')
+    //
+    // ADD-ON: a dedicated, separate report from the general KRM OTS report above.
+    // None of the OTS_* consts above are reused or renamed.
+    // -----------------------------------------------------------------------
+
+    public const NPA_OTS_SCHEMES = [
+        'krm_ots'     => 'KRM OTS',
+        'general_ots' => 'General OTS',
+        'other'       => 'Other',
+    ];
+
+    public const NPA_OTS_APPROVAL_STATUSES = [
+        'pending'  => 'Pending',
+        'approved' => 'Approved',
+        'rejected' => 'Rejected',
+    ];
+
+    public const NPA_OTS_BORROWER_RESPONSES = [
+        'accepted'              => 'Accepted OTS',
+        'requested_time'        => 'Requested Time',
+        'financial_difficulty'  => 'Financial Difficulty',
+        'refused'                => 'Refused OTS',
+        'not_available'         => 'Not Available',
+    ];
+
+    public const NPA_OTS_RECOMMENDATION_FLAGS = [
+        'rec_proposal_recommended' => 'OTS Proposal Recommended',
+        'rec_followup_required'    => 'Follow-up Required',
+        'rec_customer_refused'     => 'Customer Refused',
+        'rec_not_eligible'         => 'Not Eligible',
+    ];
+
+    public const NPA_OTS_STATUS_FLAGS = [
+        'st_customer_contacted'       => 'Customer Contacted',
+        'st_customer_verified'        => 'Customer Verified',
+        'st_ots_accepted'             => 'OTS Accepted',
+        'st_ots_rejected'             => 'OTS Rejected',
+        'st_initial_deposit_received' => 'Initial Deposit Received',
+        'st_ots_closed'               => 'OTS Closed',
+        'st_followup_required'        => 'Follow-up Required',
+    ];
+
     /**
      * Section 11 of the printed form, verbatim.
      *
@@ -325,6 +424,34 @@ final class VisitReport
     {
         return Database::instance()->first(
             'SELECT * FROM visit_ckcc_details WHERE visit_report_id = ? LIMIT 1',
+            [$visitReportId]
+        );
+    }
+
+    /**
+     * The CKCC OD Field Report section for a visit, or null when the agent did
+     * not fill it in. ADD-ON: entirely separate from ckccDetails() above.
+     *
+     * @return array<string,mixed>|null
+     */
+    public static function ckccOdDetails(int $visitReportId): ?array
+    {
+        return Database::instance()->first(
+            'SELECT * FROM visit_ckcc_od_details WHERE visit_report_id = ? LIMIT 1',
+            [$visitReportId]
+        );
+    }
+
+    /**
+     * The CKCC NPA / KRM OTS Scheme Field Report section for a visit, or null.
+     * ADD-ON: entirely separate from otsDetails() above.
+     *
+     * @return array<string,mixed>|null
+     */
+    public static function npaOtsDetails(int $visitReportId): ?array
+    {
+        return Database::instance()->first(
+            'SELECT * FROM visit_npa_ots_details WHERE visit_report_id = ? LIMIT 1',
             [$visitReportId]
         );
     }
@@ -520,7 +647,7 @@ final class VisitReport
         'state'                      => 'State',
         'pin_code'                   => 'PIN code',
         'cif_number'                 => 'CIF number',
-        'agent_mobile'               => 'BC agent / DRA mobile',
+        'agent_mobile'               => 'BC Supervisor / DRA mobile',
         'supervisor_designation'     => 'Supervisor designation',
         'supervisor_employee_id'     => 'Supervisor employee / DRA ID',
     ];

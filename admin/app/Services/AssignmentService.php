@@ -39,7 +39,7 @@ final class AssignmentService
         );
 
         if ($agent === null) {
-            return ['updated' => 0, 'skipped' => count($leadIds), 'messages' => ['The selected agent is not an active BC agent.']];
+            return ['updated' => 0, 'skipped' => count($leadIds), 'messages' => ['The selected agent is not an active BC Supervisor.']];
         }
 
         $agentBranchId = $agent['branch_id'] === null ? null : (int) $agent['branch_id'];
@@ -322,7 +322,7 @@ final class AssignmentService
                 if ($workloadByBranch[$branchId] === []) {
                     $skipped++;
                     $messages[] = sprintf(
-                        '%s was not distributed: its branch has no active BC agent.',
+                        '%s was not distributed: its branch has no active BC Supervisor.',
                         (string) $lead['loan_account_number']
                     );
                     continue;
